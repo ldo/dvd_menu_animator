@@ -1,0 +1,238 @@
+#!/usr/bin/python
+#+
+# This script aims to simplify the job of creating menus for DVD-Video
+# discs. It takes as input an SVG graphic representing the menu image
+# and button locations, lets the user choose additional colours for displaying
+# menu buttons in their highlighted and selected states, and generates
+# files suitable for input to the spumux tool in the dvdauthor package.
+#
+# Written by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+#-
+
+from __future__ import division
+import sys
+import os
+from xml.etree import \
+	ElementTree as XMLElementTree
+import rsvg
+import glib
+import gobject
+import gtk
+import getopt
+
+#+
+# Namespaces
+#-
+
+class ns :
+	"""XML namespaces."""
+	svg = "http://www.w3.org/2000/svg"
+	sodipodi = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+	inkscape = "http://www.inkscape.org/namespaces/inkscape"
+#end ns
+
+#+
+# Useful GUI stuff
+#-
+
+def BoxPack(TheWidget, TheBox) :
+	"""packes TheWidget at the start of TheBox and also returns it."""
+	TheBox.pack_start(TheWidget, False, False, 0)
+	return TheWidget
+#end BoxPack
+
+def NewMenu(InMenuBar, Label) :
+	BarMenuItem = gtk.MenuItem(label = Label)
+	TheMenu = gtk.Menu()
+	BarMenuItem.set_submenu(TheMenu)
+	InMenuBar.append(BarMenuItem)
+	return TheMenu
+#end NewMenu
+
+def NewMenuItem(InMenu, Label, Action) :
+	TheItem = gtk.MenuItem(label = Label)
+	TheItem.connect("activate", Action)
+	InMenu.append(TheItem)
+	return TheItem
+#end NewMenuItem
+
+def NewMenuSeparatorItem(InMenu) :
+	TheItem = gtk.MenuItem(label = None)
+	InMenu.append(TheItem)
+#end NewMenuSeparatorItem
+
+def DefineScrollingList(ListModel, Heading, Bounds, AddToBox) :
+	"""creates a single-column scrolling list of text items taken
+	from column 0 of ListModel, with the specified heading."""
+	ListDisplay = gtk.TreeView(ListModel)
+	Column = gtk.TreeViewColumn(Heading)
+	Column.set_alignment(0.5)
+	ListDisplay.append_column(Column)
+	Renderer = gtk.CellRendererText()
+	Column.pack_start(Renderer, True)
+	Column.add_attribute(Renderer, "text", 0)
+	ListScrolledDisplay = gtk.ScrolledWindow()
+	ListScrolledDisplay.set_policy(gtk.POLICY_NEVER, gtk.POLICY_ALWAYS)
+	ListScrolledDisplay.add(ListDisplay)
+	ListScrolledDisplay.set_size_request(*Bounds)
+	BoxPack(ListScrolledDisplay, AddToBox)
+	return ListDisplay
+#end DefineScrollingList
+
+def GetSingleListSelection(ListDisplay) :
+	"""returns the value of the currently-selected item in a list,
+	or None if none."""
+	SelectedItems = ListDisplay.get_selection().get_selected_rows()
+	if len(SelectedItems[1]) != 0 :
+		Selection = tuple(SelectedItems[0][SelectedItems[1][0]])[0]
+	else :
+		Selection = None
+	#end if
+	return Selection
+#end GetSingleListSelection
+
+#+
+# Global Data
+#-
+
+class MainWindow :
+	# Window -- gtk.Window object for main window
+	pass
+#end MainWindow
+
+class LoadedImage :
+	# Contents -- parsed XML contents of image file
+	# FileName -- pathname of image file
+	pass
+#end LoadedImage
+
+#+
+# Image management
+#-
+
+def DisplayImage() :
+	SelectedItems = MainWindow.LayerDisplay.get_selection().get_selected_rows()
+	if len(SelectedItems[1]) != 0 :
+		SelectedLayerID = tuple(MainWindow.LayerList[SelectedItems[1][0]])[1]
+	else :
+		SelectedLayerID = None
+	#end if
+	sys.stderr.write("selected layer id = %s\n" % repr(SelectedLayerID)) # debug
+	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+		LayerID = Layer.get("id")
+		if LayerID in LoadedImage.Layers :
+			Layer.set \
+			  (
+				"style",
+					"display:"
+				+
+					("none", "inline")
+						[LayerID != SelectedLayerID and LoadedImage.Layers[LayerID]["visible"]]
+			  )
+		#end if
+	#end for
+	if MainWindow.ImageDraw == None :
+		MainWindow.ImageDraw = MainWindow.ImageDisplay.window.cairo_create()
+	#end if
+	sys.stderr.write("render %s\n" % XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8")) # debug
+	MainWindow.ImageDraw.reset_clip()
+	MainWindow.ImageDraw.rectangle(*((0, 0) + MainWindow.ImageDisplay.window.get_size()))
+	MainWindow.ImageDraw.set_source_rgb(1, 1, 1)
+	MainWindow.ImageDraw.fill()
+	svg = rsvg.Handle(data = XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8"))
+	svg.render_cairo(MainWindow.ImageDraw)
+#end DisplayImage
+
+def LoadImage(FileName) :
+	LoadedImage.FileName = FileName
+	LoadedImage.Contents = XMLElementTree.parse(FileName)
+	MainWindow.LayerList.clear()
+	LoadedImage.Layers = {}
+	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+		if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
+			LayerID = Layer.get("id")
+			sys.stderr.write("found layer ID = %s\n" % repr(LayerID)) # debug
+			LoadedImage.Layers[LayerID] = \
+				{
+					"visible" : Layer.get("style") != "display:none",
+				}
+			MainWindow.LayerList.append \
+			  (
+				(Layer.get("{%s}label" % ns.inkscape), LayerID)
+			  )
+		#end if
+	#end for
+	# MainWindow.ImageDisplay.queue_draw()
+	DisplayImage()
+#end LoadImage
+
+#+
+# GUI callbacks
+#-
+
+def DestroyWindow(TheWindow) :
+	# called when main window's close box is clicked.
+	gtk.main_quit()
+#end DestroyWindow
+
+def SelectLoadImage(TheWindow) :
+	# lets the user choose an SVG file to load.
+	TheDialog = gtk.FileChooserDialog \
+	  (
+		title = "Choose SVG Image for Menu",
+		action = gtk.FILE_CHOOSER_ACTION_OPEN,
+		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+	  )
+	SVGFilter = gtk.FileFilter()
+	SVGFilter.set_name("SVG Files")
+	SVGFilter.add_pattern("*.svg")
+	TheDialog.add_filter(SVGFilter)
+	Response = TheDialog.run()
+	if Response == gtk.RESPONSE_OK :
+		ImageFileName = TheDialog.get_filename()
+	else :
+		ImageFileName = None
+	#end if
+	TheDialog.destroy()
+	if ImageFileName != None :
+		LoadImage(ImageFileName)
+	#end if
+#end SelectLoadImage
+
+def SelectionChanged(TheSelection) :
+	# MainWindow.ImageDisplay.queue_draw()
+	DisplayImage()
+#end SelectionChanged
+
+#+
+# Mainline
+#-
+
+def SetupMainWindow() :
+	global MainWindow
+	MainWindow.Window = gtk.Window()
+	MainWindow.Window.connect("destroy", DestroyWindow)
+	MainBox = gtk.VBox(False, 8)
+	MainMenuBar = BoxPack(gtk.MenuBar(), MainBox)
+	FileMenu = NewMenu(MainMenuBar, "File")
+	# FileMenu.set_accel_path("<main>/File") # doesn't seem to work
+	NewMenuItem(FileMenu, "Open...", SelectLoadImage)
+	NewMenuSeparatorItem(FileMenu)
+	NewMenuItem(FileMenu, "Quit", gtk.main_quit)
+	MiddleBox = BoxPack(gtk.HBox(False, 8), MainBox)
+	MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
+	MainWindow.ImageDisplay.set_size_request(640, 480)
+	MainWindow.ImageDraw = None # can't create yet
+	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+	MainWindow.LayerDisplay = DefineScrollingList(MainWindow.LayerList, "Button Layer", (160, 160), MiddleBox)
+	LayerSelection = MainWindow.LayerDisplay.get_selection()
+	LayerSelection.set_mode(gtk.SELECTION_SINGLE)
+	LayerSelection.connect("changed", SelectionChanged)
+	# more TBD
+	MainWindow.Window.add(MainBox)
+	MainWindow.Window.show_all()
+#end SetupMainWindow
+
+SetupMainWindow()
+MainWindow.Window.show()
+gtk.main()
