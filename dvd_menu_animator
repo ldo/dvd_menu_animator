@@ -195,6 +195,7 @@ def AnalyzeImage() :
 		raise Failure("AnalyzeImage: child terminated with status %04x\n" % Child.returncode)
 	#end if
 	ChildResult = ChildResult[re.search(r"^\s*Histogram:\s*\n", ChildResult, re.MULTILINE | re.IGNORECASE).end():]
+	MainWindow.ColorsNormalList.clear()
 	while True :
 		ColorMatch = re.match \
 		  (
@@ -205,9 +206,16 @@ def AnalyzeImage() :
 		if ColorMatch == None :
 			break
 		NrPixels, R, G, B, A = tuple(int(ColorMatch.group(i)) for i in range(1, 6))
+		MainWindow.ColorsNormalList.append(((R, G, B, A),))
 		sys.stderr.write("Colour: (%d, %d, %d, %d) = %d\n" % (R, G, B, A, NrPixels)) # debug
 		ChildResult = ChildResult[ColorMatch.end():]
 	#end while
+	if MainWindow.ColorsNormalList.iter_n_children(None) > 4 :
+		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % MainWindow.ColorsNormalList.iter_n_children(None)
+	else :
+		Msg = ""
+	#end if
+	MainWindow.StatusMsg.set_markup(Msg)
 	# more TBD
 #end AnalyzeImage
 
@@ -468,9 +476,9 @@ def SetupMainWindow() :
 	  # first col is display name, second is layer ID
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
 	  # first col is button id/name, second is bounds tuple
-	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	CommonListBounds = (160, 160)
 	MainWindow.LayerDisplay = DefineScrollingList \
 	  (
@@ -518,6 +526,7 @@ def SetupMainWindow() :
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
+	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
 	MainWindow.Window.add(MainBox)
 	MainWindow.Window.show_all()
 #end SetupMainWindow
