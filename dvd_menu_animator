@@ -360,9 +360,9 @@ def ImageRedisplay(ImageDisplay, TheEvent) :
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
 	FindButtons()
-	AnalyzeImage()
 	# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 	DisplayImage()
+	AnalyzeImage()
 #end LayerSelectionChanged
 
 #+
