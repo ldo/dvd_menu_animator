@@ -74,30 +74,47 @@ def NewMenuSeparatorItem(InMenu) :
 	InMenu.append(TheItem)
 #end NewMenuSeparatorItem
 
-def DefineScrollingList(ListModel, Heading, Bounds, AddToBox) :
+def DefineScrollingList \
+  (
+	ListModel, # the list/tree model to use
+	Col, # which column of ListModel
+	Heading, # heading for display
+	Bounds, # list bounds
+	OnSelectionChanged, # the action to connect to the "changed" signal
+	AddToBox, # the HBox or VBox in which to pack the list
+  ) :
 	"""creates a single-column scrolling list of text items taken
-	from column 0 of ListModel, with the specified heading."""
+	from the specified column of ListModel, with the specified heading."""
 	ListDisplay = gtk.TreeView(ListModel)
 	Column = gtk.TreeViewColumn(Heading)
 	Column.set_alignment(0.5)
 	ListDisplay.append_column(Column)
 	Renderer = gtk.CellRendererText()
 	Column.pack_start(Renderer, True)
-	Column.add_attribute(Renderer, "text", 0)
+	Column.add_attribute(Renderer, "text", Col)
 	ListScrolledDisplay = gtk.ScrolledWindow()
-	ListScrolledDisplay.set_policy(gtk.POLICY_NEVER, gtk.POLICY_ALWAYS)
+	ListScrolledDisplay.set_policy \
+	  (
+		hscrollbar_policy = gtk.POLICY_NEVER,
+		vscrollbar_policy = gtk.POLICY_ALWAYS
+	  )
 	ListScrolledDisplay.add(ListDisplay)
 	ListScrolledDisplay.set_size_request(*Bounds)
 	BoxPack(ListScrolledDisplay, AddToBox)
+	ListSelection = ListDisplay.get_selection()
+	ListSelection.set_mode(gtk.SELECTION_SINGLE)
+	if OnSelectionChanged != None :
+		ListSelection.connect("changed", OnSelectionChanged)
+	#end if
 	return ListDisplay
 #end DefineScrollingList
 
-def GetSingleListSelection(ListDisplay) :
-	"""returns the value of the currently-selected item in a list,
-	or None if none."""
+def GetSingleListSelection(ListDisplay, Col) :
+	"""returns the value from the specified column of the currently-selected item
+	in a list, or None if none."""
 	SelectedItems = ListDisplay.get_selection().get_selected_rows()
 	if len(SelectedItems[1]) != 0 :
-		Selection = tuple(SelectedItems[0][SelectedItems[1][0]])[0]
+		Selection = tuple(SelectedItems[0][SelectedItems[1][0]])[Col]
 	else :
 		Selection = None
 	#end if
@@ -139,12 +156,7 @@ class LoadedImage :
 def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image, hiding the currently-selected
 	button layer."""
-	SelectedItems = MainWindow.LayerDisplay.get_selection().get_selected_rows()
-	if len(SelectedItems[1]) != 0 :
-		SelectedLayerID = tuple(MainWindow.LayerList[SelectedItems[1][0]])[1]
-	else :
-		SelectedLayerID = None
-	#end if
+	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
 	sys.stderr.write("selected layer id = %s\n" % repr(SelectedLayerID)) # debug
 	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
 		LayerID = Layer.get("id")
@@ -229,12 +241,40 @@ def LoadImage(FileName) :
 			MainWindow.LayerList.append(Layer)
 		#end for
 		LoadedImage.Layers = NewLayers
-		# MainWindow.ImageDisplay.queue_draw()
+		# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 		DisplayImage()
 	except Failure, Reason :
 		ErrorAlert(Reason.Msg)
 	#end try
 #end LoadImage
+
+def FindButtons() :
+	"""finds all button definitions in the selected button layer."""
+	TheLayer = None # initial assumption
+	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
+	if SelectedLayerID != None :
+		for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+			if Layer.get("id") == SelectedLayerID :
+				TheLayer = Layer
+				break
+			#end if
+		#end for
+	#end if
+	MainWindow.ButtonList.clear()
+	if TheLayer != None :
+		for Button in TheLayer.findall("{%s}rect" % ns.svg) :
+			ButtonName = Button.get("id")
+			ButtonBounds = \
+				(
+					float(Button.get("x")),
+					float(Button.get("y")),
+					float(Button.get("width")),
+					float(Button.get("height")),
+				)
+			MainWindow.ButtonList.append((ButtonName, ButtonBounds))
+		#end for
+	#end if
+#end FindButtons()
 
 #+
 # GUI callbacks
@@ -269,41 +309,97 @@ def SelectLoadImage(TheWindow) :
 	#end if
 #end SelectLoadImage
 
-def ImageRedisplay(ImageDisplay) :
-	DisplayImage()
+def ImageRedisplay(ImageDisplay, TheEvent) :
+	sys.stderr.write("expose event received\n") # debug
+	DisplayImage() # why doesn't this work?
+	return True
 #end ImageRedisplay
 
-def SelectionChanged(TheSelection) :
-	# MainWindow.ImageDisplay.queue_draw()
+def LayerSelectionChanged(TheSelection) :
+	FindButtons()
+	# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 	DisplayImage()
-#end SelectionChanged
+#end LayerSelectionChanged
 
 #+
 # Mainline
 #-
 
 def SetupMainWindow() :
+	"""creates all the window widgets and attaches all associated event handlers."""
 	global MainWindow
 	MainWindow.Window = gtk.Window()
 	MainWindow.Window.connect("destroy", DestroyWindow)
-	MainBox = gtk.VBox(False, 8)
+	CommonBoxMargin = 8
+	MainBox = gtk.VBox(False, CommonBoxMargin)
 	MainMenuBar = BoxPack(gtk.MenuBar(), MainBox)
 	FileMenu = NewMenu(MainMenuBar, "File")
 	# FileMenu.set_accel_path("<main>/File") # doesn't seem to work
 	NewMenuItem(FileMenu, "Open...", SelectLoadImage)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", gtk.main_quit)
-	MiddleBox = BoxPack(gtk.HBox(False, 8), MainBox)
+	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
 	MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
-	# MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay) # why doesn't this work?
-	# MainWindow.ImageDisplay.set_size_request(640, 480)
+	MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay)
+	MainWindow.ImageDisplay.set_size_request(640, 480)
 	MainWindow.ImageDraw = None # can't create yet
+	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
+	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
+	List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
 	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-	MainWindow.LayerDisplay = DefineScrollingList(MainWindow.LayerList, "Button Layer", (160, 160), MiddleBox)
-	LayerSelection = MainWindow.LayerDisplay.get_selection()
-	LayerSelection.set_mode(gtk.SELECTION_SINGLE)
-	LayerSelection.connect("changed", SelectionChanged)
-	# more TBD
+	  # first col is display name, second is layer ID
+	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+	  # first col is button id/name, second is bounds tuple
+	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+	CommonListBounds = (160, 160)
+	MainWindow.LayerDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.LayerList,
+		Col = 0,
+		Heading = "Button Layer",
+		Bounds = CommonListBounds,
+		OnSelectionChanged = LayerSelectionChanged,
+		AddToBox = List1Box
+	  )
+	MainWindow.ButtonDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.ButtonList,
+		Col = 0,
+		Heading = "Buttons",
+		Bounds = CommonListBounds,
+		OnSelectionChanged = None, # ButtonSelectionChanged TBD
+		AddToBox = List1Box
+	  )
+	# TBD replace DefineScrollingList below with custom renderer to show actual colours
+	MainWindow.ColorsNormalDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.ColorsNormalList,
+		Col = 0,
+		Heading = "Normal",
+		Bounds = CommonListBounds,
+		OnSelectionChanged = None,
+		AddToBox = List2Box
+	  )
+	MainWindow.ColorsHighlightedDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.ColorsHighlightedList,
+		Col = 0,
+		Heading = "Highlight",
+		Bounds = CommonListBounds,
+		OnSelectionChanged = None,
+		AddToBox = List2Box
+	  )
+	MainWindow.ColorsSelectedDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.ColorsSelectedList,
+		Col = 0,
+		Heading = "Select",
+		Bounds = CommonListBounds,
+		OnSelectionChanged = None,
+		AddToBox = List2Box
+	  )
 	MainWindow.Window.add(MainBox)
 	MainWindow.Window.show_all()
 #end SetupMainWindow
