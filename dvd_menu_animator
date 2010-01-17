@@ -14,9 +14,11 @@ import sys
 import os
 import subprocess
 import re
+import array
 import xml.parsers.expat
 from xml.etree import \
 	ElementTree as XMLElementTree
+import cairo
 import rsvg
 import glib
 import gobject
@@ -160,9 +162,9 @@ def ImageAsSVG() :
 	return XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8")
 #end ImageAsSVG
 
-def DisplayImage() :
-	"""(re)displays the currently-loaded SVG image, hiding the currently-selected
-	button layer."""
+def AnalyzeImage() :
+	"""hides the button layer and determines what colours are present in the rest
+	of the image. Uses the ImageMagick "identify" program."""
 	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
 	sys.stderr.write("selected layer id = %s\n" % repr(SelectedLayerID)) # debug
 	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
@@ -180,28 +182,6 @@ def DisplayImage() :
 			  )
 		#end if
 	#end for
-	if MainWindow.ImageDraw == None :
-		MainWindow.ImageDraw = MainWindow.ImageDisplay.window.cairo_create()
-	#end if
-	ImageDrawSize = MainWindow.ImageDisplay.window.get_size()
-	MainWindow.ImageDraw.identity_matrix()
-	MainWindow.ImageDraw.reset_clip()
-	MainWindow.ImageDraw.rectangle(*((0, 0) + ImageDrawSize))
-	MainWindow.ImageDraw.set_source_rgb(1, 1, 1)
-	MainWindow.ImageDraw.fill()
-	ScaleFactor = min \
-	  (
-		ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-		ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-	  ) # make sure it's all visible
-	MainWindow.ImageDraw.scale(ScaleFactor, ScaleFactor)
-	svg = rsvg.Handle(data = ImageAsSVG())
-	svg.render_cairo(MainWindow.ImageDraw)
-#end DisplayImage
-
-def AnalyzeImage() :
-	"""determines what colours are present in the image, excluding the button layer.
-	Uses the ImageMagick "identify" program."""
 	Child = subprocess.Popen \
 	  (
 		args = ("identify", "-verbose", "svg:/dev/stdin"),
@@ -216,7 +196,12 @@ def AnalyzeImage() :
 	#end if
 	ChildResult = ChildResult[re.search(r"^\s*Histogram:\s*\n", ChildResult, re.MULTILINE | re.IGNORECASE).end():]
 	while True :
-		ColorMatch = re.match(r"^\s*(\d+)\:\s+\(\s*(\d+)\,\s*(\d+)\,\s*(\d+)\,\s*(\d+)\).+\n", ChildResult, re.MULTILINE)
+		ColorMatch = re.match \
+		  (
+			r"^\s*(\d+)\:\s+\(\s*(\d+)\,\s*(\d+)\,\s*(\d+)\,\s*(\d+)\).+\n",
+			ChildResult,
+			re.MULTILINE
+		  )
 		if ColorMatch == None :
 			break
 		NrPixels, R, G, B, A = tuple(int(ColorMatch.group(i)) for i in range(1, 6))
@@ -225,6 +210,89 @@ def AnalyzeImage() :
 	#end while
 	# more TBD
 #end AnalyzeImage
+
+def DisplayImage() :
+	"""(re)displays the currently-loaded SVG image."""
+	if LoadedImage.Contents != None :
+		if False :
+			if MainWindow.ImageDraw == None :
+				MainWindow.ImageDraw = MainWindow.ImageDisplay.window.cairo_create()
+			#end if
+			ImageDrawSize = MainWindow.ImageDisplay.window.get_size()
+			MainWindow.ImageDraw.identity_matrix()
+			MainWindow.ImageDraw.reset_clip()
+			MainWindow.ImageDraw.rectangle(*((0, 0) + ImageDrawSize))
+			MainWindow.ImageDraw.set_source_rgb(1, 1, 1)
+			MainWindow.ImageDraw.fill()
+			ScaleFactor = min \
+			  (
+				ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+				ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+			  ) # make sure it's all visible
+			MainWindow.ImageDraw.scale(ScaleFactor, ScaleFactor)
+			svg = rsvg.Handle(data = ImageAsSVG())
+			svg.render_cairo(MainWindow.ImageDraw) # causes X errors now
+		else :
+			# fudge to avoid X errors by rendering SVG to offscreen
+			ImageDrawSize = ((720, 540), (960, 540))[LoadedImage.Widescreen]
+			if hasattr(cairo, "format_stride_for_width") :
+				RowStride = cairo.format_stride_for_width(cairo.FORMAT_ARGB32, ImageDrawSize[0])
+			else :
+				RowStride = ImageDrawSize[0] * 4
+			#end if
+			Pixels = array.array \
+			  (
+				"B",
+					(1, 1, 1, 1)
+				*
+					(RowStride // 4 * ImageDrawSize[1])
+			  )
+			OffscreenPix = cairo.ImageSurface.create_for_data \
+			  (
+				Pixels, # data
+				cairo.FORMAT_ARGB32, # format
+				ImageDrawSize[0], # width
+				ImageDrawSize[1], # height
+				RowStride # stride
+			  )
+			Offscreen = cairo.Context(OffscreenPix)
+			Offscreen.identity_matrix()
+			Offscreen.reset_clip()
+			Offscreen.rectangle(*((0, 0) + ImageDrawSize))
+			Offscreen.set_source_rgba(1, 1, 1, 1)
+			Offscreen.fill()
+			ScaleFactor = min \
+			  (
+				ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+				ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+			  ) # make sure it's all visible
+			Offscreen.scale(ScaleFactor, ScaleFactor)
+			svg = rsvg.Handle(data = ImageAsSVG())
+			svg.render_cairo(Offscreen)
+			OffscreenPix.flush()
+			for Row in range(0, ImageDrawSize[1]) :
+				# need to rearrange pixel components between Cairo and GTK formats.
+				# Is this endian-dependent?
+				RowBase = Row * RowStride
+				for Col in range(0, ImageDrawSize[0]) :
+					ColBase = RowBase + Col * 4
+					Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
+				#end for
+			#end for
+			Offscreen = gtk.gdk.pixbuf_new_from_data \
+			  (
+				data = Pixels.tostring(),
+				colorspace = gtk.gdk.COLORSPACE_RGB, # hope this matches the Cairo layout
+				has_alpha = True,
+				bits_per_sample = 8,
+				width = ImageDrawSize[0],
+				height = ImageDrawSize[1],
+				rowstride = RowStride
+			  )
+			MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
+		#end if
+	#end if
+#end DisplayImage
 
 def LoadImage(FileName) :
 	"""loads a new SVG image file and also collects various useful information about it."""
@@ -276,13 +344,14 @@ def LoadImage(FileName) :
 		LoadedImage.Contents = NewContents
 		LoadedImage.SrcDimensions = NewSrcDimensions
 		LoadedImage.Widescreen = Widescreen
-		MainWindow.ImageDisplay.set_size_request(*(((720, 540), (960, 540))[Widescreen]))
+		# MainWindow.ImageDisplay.set_size_request(*(((720, 540), (960, 540))[Widescreen]))
 		  # how can I keep it user-resizable?
 		MainWindow.LayerList.clear()
 		for Layer in NewLayerList :
 			MainWindow.LayerList.append(Layer)
 		#end for
 		LoadedImage.Layers = NewLayers
+		AnalyzeImage()
 		# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 		DisplayImage()
 	except Failure, Reason :
@@ -360,9 +429,9 @@ def ImageRedisplay(ImageDisplay, TheEvent) :
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
 	FindButtons()
+	AnalyzeImage()
 	# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 	DisplayImage()
-	AnalyzeImage()
 #end LayerSelectionChanged
 
 #+
@@ -383,10 +452,15 @@ def SetupMainWindow() :
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", gtk.main_quit)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
-	MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
-	MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay)
-	MainWindow.ImageDisplay.set_size_request(640, 480)
-	MainWindow.ImageDraw = None # can't create yet
+	if False :
+		MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
+		MainWindow.ImageDisplay.set_app_paintable(True) # ?
+		MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay)
+		MainWindow.ImageDisplay.set_size_request(640, 480)
+		MainWindow.ImageDraw = None # can't create yet
+	else :
+		MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
+	#end if
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
 	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
 	List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
@@ -449,5 +523,6 @@ def SetupMainWindow() :
 #end SetupMainWindow
 
 SetupMainWindow()
+LoadedImage.Contents = None # to begin with
 MainWindow.Window.show()
 gtk.main()
