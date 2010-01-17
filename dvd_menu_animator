@@ -91,6 +91,19 @@ def GetSingleListSelection(ListDisplay) :
 	return Selection
 #end GetSingleListSelection
 
+def ErrorAlert(Msg) :
+	"""displays a simple modal alert error message box."""
+	TheDialog = gtk.MessageDialog \
+	  (
+		flags = gtk.DIALOG_MODAL,
+		buttons = gtk.BUTTONS_OK,
+		type = gtk.MESSAGE_ERROR,
+		message_format = Msg
+	  )
+	Response = TheDialog.run()
+	TheDialog.destroy()
+#end ErrorAlert
+
 #+
 # Global Data
 #-
@@ -134,7 +147,6 @@ def DisplayImage() :
 	if MainWindow.ImageDraw == None :
 		MainWindow.ImageDraw = MainWindow.ImageDisplay.window.cairo_create()
 	#end if
-	sys.stderr.write("render %s\n" % XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8")) # debug
 	MainWindow.ImageDraw.reset_clip()
 	MainWindow.ImageDraw.rectangle(*((0, 0) + MainWindow.ImageDisplay.window.get_size()))
 	MainWindow.ImageDraw.set_source_rgb(1, 1, 1)
@@ -144,26 +156,40 @@ def DisplayImage() :
 #end DisplayImage
 
 def LoadImage(FileName) :
-	LoadedImage.FileName = FileName
-	LoadedImage.Contents = XMLElementTree.parse(FileName)
-	MainWindow.LayerList.clear()
-	LoadedImage.Layers = {}
-	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+	NewContents = XMLElementTree.parse(FileName)
+	NewLayers = {}
+	NewLayerList = []
+	for Layer in NewContents.findall("{%s}g" % ns.svg) :
 		if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
 			LayerID = Layer.get("id")
 			sys.stderr.write("found layer ID = %s\n" % repr(LayerID)) # debug
-			LoadedImage.Layers[LayerID] = \
+			NewLayers[LayerID] = \
 				{
 					"visible" : Layer.get("style") != "display:none",
 				}
-			MainWindow.LayerList.append \
+			NewLayerList.append \
 			  (
 				(Layer.get("{%s}label" % ns.inkscape), LayerID)
 			  )
 		#end if
 	#end for
-	# MainWindow.ImageDisplay.queue_draw()
-	DisplayImage()
+	if len(NewLayerList) != 0 :
+		if len(NewLayerList) > 1 :
+			LoadedImage.FileName = FileName
+			LoadedImage.Contents = NewContents
+			MainWindow.LayerList.clear()
+			for Layer in NewLayerList :
+				MainWindow.LayerList.append(Layer)
+			#end for
+			LoadedImage.Layers = NewLayers
+			# MainWindow.ImageDisplay.queue_draw()
+			DisplayImage()
+		else :
+			ErrorAlert("Need at least 2 layers, one for image and one for buttons.")
+		#end if
+	else :
+		ErrorAlert("No layers found in document. Are you sure it was created by Inkscape?")
+	#end if
 #end LoadImage
 
 #+
