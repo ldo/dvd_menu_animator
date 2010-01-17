@@ -59,6 +59,7 @@ def BoxPack(TheWidget, TheBox) :
 #end BoxPack
 
 def NewMenu(InMenuBar, Label) :
+	"""creates a new menu in the specified menu bar with the specified name."""
 	BarMenuItem = gtk.MenuItem(label = Label)
 	TheMenu = gtk.Menu()
 	BarMenuItem.set_submenu(TheMenu)
@@ -67,6 +68,8 @@ def NewMenu(InMenuBar, Label) :
 #end NewMenu
 
 def NewMenuItem(InMenu, Label, AccelGroup, AccelKey, Action) :
+	"""creates a new item in the specified menu with the specified label,
+	action to be performed on selection, and optional accelerator key."""
 	TheItem = gtk.MenuItem(label = Label)
 	TheItem.connect("activate", Action)
 	InMenu.append(TheItem)
@@ -84,6 +87,7 @@ def NewMenuItem(InMenu, Label, AccelGroup, AccelKey, Action) :
 #end NewMenuItem
 
 def NewMenuSeparatorItem(InMenu) :
+	"""creates a new separator item in the specified menu."""
 	TheItem = gtk.MenuItem(label = None)
 	InMenu.append(TheItem)
 #end NewMenuSeparatorItem
@@ -91,21 +95,30 @@ def NewMenuSeparatorItem(InMenu) :
 def DefineScrollingList \
   (
 	ListModel, # the list/tree model to use
-	Col, # which column of ListModel
+	Col, # which column of ListModel to get cell value from
 	Heading, # heading for display
 	Bounds, # list bounds
+	Renderer, # defaults to text renderer if omitted
+	ColAttribute, # name of renderer attribute to set to cell value
 	OnSelectionChanged, # the action to connect to the "changed" signal
 	AddToBox, # the HBox or VBox in which to pack the list
   ) :
-	"""creates a single-column scrolling list of text items taken
-	from the specified column of ListModel, with the specified heading."""
+	"""creates a single-column scrolling list of items taken from the specified
+	column of ListModel, with the specified heading."""
 	ListDisplay = gtk.TreeView(ListModel)
 	Column = gtk.TreeViewColumn(Heading)
 	Column.set_alignment(0.5)
 	ListDisplay.append_column(Column)
-	Renderer = gtk.CellRendererText()
+	if Renderer == None :
+		Renderer = gtk.CellRendererText()
+	#end if
 	Column.pack_start(Renderer, True)
-	Column.add_attribute(Renderer, "text", Col)
+	if ColAttribute == None and hasattr(Renderer, "on_celldata") :
+		Column.set_cell_data_func(Renderer, Renderer.on_celldata, None)
+		  # on_celldata should be a static method
+	else :
+		Column.add_attribute(Renderer, ColAttribute, Col)
+	#end if
 	ListScrolledDisplay = gtk.ScrolledWindow()
 	ListScrolledDisplay.set_policy \
 	  (
@@ -134,6 +147,48 @@ def GetSingleListSelection(ListDisplay, Col) :
 	#end if
 	return Selection
 #end GetSingleListSelection
+
+class ColorCellRenderer(gtk.GenericCellRenderer) :
+
+	# def __init__(self) :
+	#     mustn't be present, or it doesn't get initialized properly
+	#end __init__
+
+	def on_get_size(self, DrawWhere, CellRect) :
+		sys.stderr.write("ColorCellRenderer %s, %s get_size = %s\n" % (repr(self), repr(DrawWhere), repr(CellRect))) # debug
+		return (0, 0, 160, 20)
+	#end on_get_size
+
+	@staticmethod
+	def on_celldata(Column, Cell, Model, Iter, UserData) :
+		Cell.color = Model.get_value(Iter, 0)
+	#end on_celldata
+
+	def on_render(self, DrawWhere, DrawOwner, BackgroundRect, CellRect, ExposeRect, Flags) :
+		Draw = gtk.gdk.GC(DrawWhere)
+		ColorMap = Draw.get_colormap()
+		Draw.set_function(gtk.gdk.COPY)
+		Fade = 0xffff - self.color[3]
+		Draw.set_foreground(ColorMap.alloc_color(gtk.gdk.Color(self.color[0] + Fade, self.color[1] + Fade, self.color[2] + Fade)))
+		DrawWhere.draw_rectangle(Draw, True, CellRect.x, CellRect.y, CellRect.width, CellRect.height)
+		if Flags == gtk.CELL_RENDERER_SELECTED :
+			Draw.set_function(gtk.gdk.INVERT)
+			Draw.set_line_attributes \
+			  (
+				line_width = 2,
+				line_style = gtk.gdk.LINE_SOLID,
+				cap_style = gtk.gdk.CAP_BUTT,
+				join_style = gtk.gdk.JOIN_MITER
+			  )
+			DrawWhere.draw_rectangle(Draw, False, CellRect.x, CellRect.y, CellRect.width, CellRect.height)
+		#end if
+	#end on_render
+
+	def on_activate(self, TheEvent, EventTarget, LocationPath, BackgroundRect, CellRect, Flags) :
+		pass
+	#end on_activate
+
+#end ColorCellRenderer
 
 def ErrorAlert(Msg) :
 	"""displays a simple modal alert error message box."""
@@ -496,6 +551,8 @@ def SetupMainWindow() :
 	  (
 		ListModel = MainWindow.LayerList,
 		Col = 0,
+		Renderer = None,
+		ColAttribute = "text",
 		Heading = "Button Layer",
 		Bounds = CommonListBounds,
 		OnSelectionChanged = LayerSelectionChanged,
@@ -505,16 +562,19 @@ def SetupMainWindow() :
 	  (
 		ListModel = MainWindow.ButtonList,
 		Col = 0,
+		Renderer = None,
+		ColAttribute = "text",
 		Heading = "Buttons",
 		Bounds = CommonListBounds,
 		OnSelectionChanged = None, # ButtonSelectionChanged TBD
 		AddToBox = List1Box
 	  )
-	# TBD replace DefineScrollingList below with custom renderer to show actual colours
 	MainWindow.ColorsNormalDisplay = DefineScrollingList \
 	  (
 		ListModel = MainWindow.ColorsNormalList,
 		Col = 0,
+		Renderer = ColorCellRenderer(),
+		ColAttribute = None, # can't just simply add my own properties without registering them for an object class
 		Heading = "Normal",
 		Bounds = CommonListBounds,
 		OnSelectionChanged = None,
@@ -524,6 +584,8 @@ def SetupMainWindow() :
 	  (
 		ListModel = MainWindow.ColorsHighlightedList,
 		Col = 0,
+		Renderer = ColorCellRenderer(),
+		ColAttribute = None,
 		Heading = "Highlight",
 		Bounds = CommonListBounds,
 		OnSelectionChanged = None,
@@ -533,6 +595,8 @@ def SetupMainWindow() :
 	  (
 		ListModel = MainWindow.ColorsSelectedList,
 		Col = 0,
+		Renderer = ColorCellRenderer(),
+		ColAttribute = None,
 		Heading = "Select",
 		Bounds = CommonListBounds,
 		OnSelectionChanged = None,
