@@ -12,6 +12,7 @@
 from __future__ import division
 import sys
 import os
+import xml.parsers.expat
 from xml.etree import \
 	ElementTree as XMLElementTree
 import rsvg
@@ -19,6 +20,18 @@ import glib
 import gobject
 import gtk
 import getopt
+
+#+
+# Useful stuff
+#-
+
+class Failure(Exception) :
+
+	def __init__(self, Msg) :
+		self.Msg = Msg
+	#end __init__
+
+#end Failure
 
 #+
 # Namespaces
@@ -124,6 +137,8 @@ class LoadedImage :
 #-
 
 def DisplayImage() :
+	"""(re)displays the currently-loaded SVG image, hiding the currently-selected
+	button layer."""
 	SelectedItems = MainWindow.LayerDisplay.get_selection().get_selected_rows()
 	if len(SelectedItems[1]) != 0 :
 		SelectedLayerID = tuple(MainWindow.LayerList[SelectedItems[1][0]])[1]
@@ -141,6 +156,8 @@ def DisplayImage() :
 				+
 					("none", "inline")
 						[LayerID != SelectedLayerID and LoadedImage.Layers[LayerID]["visible"]]
+						  # set button layer to invisible, restore visibility of rest to
+						  # original state
 			  )
 		#end if
 	#end for
@@ -156,40 +173,67 @@ def DisplayImage() :
 #end DisplayImage
 
 def LoadImage(FileName) :
-	NewContents = XMLElementTree.parse(FileName)
-	NewLayers = {}
-	NewLayerList = []
-	for Layer in NewContents.findall("{%s}g" % ns.svg) :
-		if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
-			LayerID = Layer.get("id")
-			sys.stderr.write("found layer ID = %s\n" % repr(LayerID)) # debug
-			NewLayers[LayerID] = \
-				{
-					"visible" : Layer.get("style") != "display:none",
-				}
-			NewLayerList.append \
-			  (
-				(Layer.get("{%s}label" % ns.inkscape), LayerID)
-			  )
-		#end if
-	#end for
-	if len(NewLayerList) != 0 :
-		if len(NewLayerList) > 1 :
-			LoadedImage.FileName = FileName
-			LoadedImage.Contents = NewContents
-			MainWindow.LayerList.clear()
-			for Layer in NewLayerList :
-				MainWindow.LayerList.append(Layer)
-			#end for
-			LoadedImage.Layers = NewLayers
-			# MainWindow.ImageDisplay.queue_draw()
-			DisplayImage()
+	"""loads a new SVG image file and also collects various useful information about it."""
+	try :
+		try :
+			NewContents = XMLElementTree.parse(FileName)
+		except xml.parsers.expat.ExpatError :
+			raise Failure("Not a valid SVG file.")
+		#end try
+		NewLayers = {}
+		NewLayerList = []
+		SVGTag = NewContents.getroot()
+		NewSrcDimensions = (float(SVGTag.get("width")), float(SVGTag.get("height")))
+		AspectRatio = NewSrcDimensions[0] / NewSrcDimensions[1]
+		AspectTolerance = 0.05
+		if abs(AspectRatio / 4 * 3 - 1) <= AspectTolerance :
+			Widescreen = False
+		elif abs(AspectRatio / 16 * 9 - 1) <= AspectTolerance :
+			Widescreen = True
 		else :
-			ErrorAlert("Need at least 2 layers, one for image and one for buttons.")
+			raise Failure("Image dimensions cannot be approximated as either 4:3 or 16:9")
 		#end if
-	else :
-		ErrorAlert("No layers found in document. Are you sure it was created by Inkscape?")
-	#end if
+		sys.stderr.write("image dimensions = %s, widescreen = %s\n" % (repr(NewSrcDimensions), ("F", "T")[Widescreen])) # debug
+		for Layer in NewContents.findall("{%s}g" % ns.svg) :
+			if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
+				LayerID = Layer.get("id")
+				sys.stderr.write("found layer ID = %s\n" % repr(LayerID)) # debug
+				NewLayers[LayerID] = \
+					{
+						"visible" : Layer.get("style") != "display:none",
+						  # save initial visibility state
+						  # Assumption: Inkscape only sets style attribute to "display:inline"
+						  # for visible layers and "display:none" for invisible ones
+					}
+				NewLayerList.append \
+				  (
+					(Layer.get("{%s}label" % ns.inkscape), LayerID)
+				  )
+			#end if
+		#end for
+		if len(NewLayerList) == 0 :
+			raise Failure("No layers found in document. Are you sure it was created by Inkscape?")
+		#end if
+		if len(NewLayerList) == 1 :
+			raise Failure("Need at least 2 layers, one for image and one for buttons.")
+		#end if
+		# passed all validation checks
+		LoadedImage.FileName = FileName
+		LoadedImage.Contents = NewContents
+		LoadedImage.SrcDimensions = NewSrcDimensions
+		LoadedImage.Widescreen = Widescreen
+		MainWindow.ImageDisplay.set_size_request(*(((720, 540), (960, 540))[Widescreen]))
+		  # how can I keep it user-resizable?
+		MainWindow.LayerList.clear()
+		for Layer in NewLayerList :
+			MainWindow.LayerList.append(Layer)
+		#end for
+		LoadedImage.Layers = NewLayers
+		# MainWindow.ImageDisplay.queue_draw()
+		DisplayImage()
+	except Failure, Reason :
+		ErrorAlert(Reason.Msg)
+	#end try
 #end LoadImage
 
 #+
@@ -225,6 +269,10 @@ def SelectLoadImage(TheWindow) :
 	#end if
 #end SelectLoadImage
 
+def ImageRedisplay(ImageDisplay) :
+	DisplayImage()
+#end ImageRedisplay
+
 def SelectionChanged(TheSelection) :
 	# MainWindow.ImageDisplay.queue_draw()
 	DisplayImage()
@@ -247,7 +295,8 @@ def SetupMainWindow() :
 	NewMenuItem(FileMenu, "Quit", gtk.main_quit)
 	MiddleBox = BoxPack(gtk.HBox(False, 8), MainBox)
 	MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
-	MainWindow.ImageDisplay.set_size_request(640, 480)
+	# MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay) # why doesn't this work?
+	# MainWindow.ImageDisplay.set_size_request(640, 480)
 	MainWindow.ImageDraw = None # can't create yet
 	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
 	MainWindow.LayerDisplay = DefineScrollingList(MainWindow.LayerList, "Button Layer", (160, 160), MiddleBox)
