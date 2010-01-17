@@ -66,10 +66,20 @@ def NewMenu(InMenuBar, Label) :
 	return TheMenu
 #end NewMenu
 
-def NewMenuItem(InMenu, Label, Action) :
+def NewMenuItem(InMenu, Label, AccelGroup, AccelKey, Action) :
 	TheItem = gtk.MenuItem(label = Label)
 	TheItem.connect("activate", Action)
 	InMenu.append(TheItem)
+	if AccelGroup != None :
+		TheItem.add_accelerator \
+		  (
+			accel_signal = "activate",
+			accel_group = AccelGroup,
+			accel_key = ord(AccelKey),
+			accel_mods = gtk.gdk.CONTROL_MASK,
+			accel_flags = gtk.ACCEL_VISIBLE
+		  )
+	#end if
 	return TheItem
 #end NewMenuItem
 
@@ -454,11 +464,13 @@ def SetupMainWindow() :
 	CommonBoxMargin = 8
 	MainBox = gtk.VBox(False, CommonBoxMargin)
 	MainMenuBar = BoxPack(gtk.MenuBar(), MainBox)
+	MenuAccelGroup = gtk.AccelGroup()
+	MainWindow.Window.add_accel_group(MenuAccelGroup)
 	FileMenu = NewMenu(MainMenuBar, "File")
 	# FileMenu.set_accel_path("<main>/File") # doesn't seem to work
-	NewMenuItem(FileMenu, "Open...", SelectLoadImage)
+	NewMenuItem(FileMenu, "Open...", MenuAccelGroup, "O", SelectLoadImage)
 	NewMenuSeparatorItem(FileMenu)
-	NewMenuItem(FileMenu, "Quit", gtk.main_quit)
+	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
 	if False :
 		MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
