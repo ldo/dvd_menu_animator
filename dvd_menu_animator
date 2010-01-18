@@ -291,40 +291,9 @@ def AnalyzeImage() :
 			  )
 		#end if
 	#end for
-	if False :
-		Child = subprocess.Popen \
-		  (
-			args = ("identify", "-verbose", "svg:/dev/stdin"),
-			stdin = subprocess.PIPE,
-			stdout = subprocess.PIPE,
-			close_fds = True,
-			shell = False
-		  )
-		ChildResult, Ignore = Child.communicate(ImageAsSVG())
-		if Child.returncode != 0 :
-			raise Failure("AnalyzeImage: child terminated with status %04x\n" % Child.returncode)
-		#end if
-		ChildResult = ChildResult[re.search(r"^\s*Histogram:\s*\n", ChildResult, re.MULTILINE | re.IGNORECASE).end():]
-		MainWindow.ColorsNormalList.clear()
-		while True :
-			ColorMatch = re.match \
-			  (
-				r"^\s*(\d+)\:\s+\(\s*(\d+)\,\s*(\d+)\,\s*(\d+)\,\s*(\d+)\).+\n",
-				ChildResult,
-				re.MULTILINE
-			  )
-			if ColorMatch == None :
-				break
-			NrPixels, R, G, B, A = tuple(int(ColorMatch.group(i)) for i in range(1, 6))
-			MainWindow.ColorsNormalList.append(((R, G, B, A),))
-			sys.stderr.write("Colour: (%d, %d, %d, %d) = %d\n" % (R, G, B, A, NrPixels)) # debug
-			ChildResult = ChildResult[ColorMatch.end():]
-		#end while
-	else :
-		IndexedImage, Colors = spuhelper.index_image(RenderImagePix()[0])
-		sys.stderr.write("index_image result = %s, %s\n" % (IndexedImage, Colors)) # debug
-		# more TBD
-	#end if
+	IndexedImage, Colors = spuhelper.index_image(RenderImagePix()[0])
+	sys.stderr.write("index_image result = %s, %s\n" % (IndexedImage, Colors)) # debug
+	# more TBD
 	if MainWindow.ColorsNormalList.iter_n_children(None) > 4 :
 		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % MainWindow.ColorsNormalList.iter_n_children(None)
 	else :
@@ -338,19 +307,7 @@ def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image."""
 	if LoadedImage.Contents != None :
 		Pixels, ImageDrawSize, RowStride = RenderImagePix()
-		if False :
-			for Row in range(0, ImageDrawSize[1]) :
-				# need to rearrange pixel components between Cairo and GTK formats.
-				# Is this endian-dependent?
-				RowBase = Row * RowStride
-				for Col in range(0, ImageDrawSize[0]) :
-					ColBase = RowBase + Col * 4
-					Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
-				#end for
-			#end for
-		else :
-			spuhelper.cairo_to_gtk(Pixels)
-		#end if
+		spuhelper.cairo_to_gtk(Pixels)
 		Offscreen = gtk.gdk.pixbuf_new_from_data \
 		  (
 			data = Pixels.tostring(),
