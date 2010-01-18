@@ -233,15 +233,6 @@ static PyObject * spuhelper_index_image
 					histogram[histindex].index = bestindex;
 				  } /*for*/
 			  }
-			  { /* debug */
-				fprintf(stderr, "sorted histogram:\n");
-				for (histindex = 0; histindex < nrhistentries; ++histindex)
-				  {
-					fprintf(stderr, "%d(%d) : %08x(%d)\n",
-						(unsigned int)histindex, histogram[histindex].index,
-						histogram[histindex].pixel, (unsigned int)histogram[histindex].count);
-				  } /*for*/
-			  }
 			  {
 			  /* generate indexed version of image */
 				const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
@@ -416,6 +407,7 @@ static PyMethodDef spuhelper_methods[] =
 		"analyzes a buffer of RGBA-format pixels in Cairo (native-endian) ordering, and"
 		" returns a tuple of 2 elements, the first being a new array object containing"
 		" 2 bits per pixel, and the second being a tuple of corresponding colours."
+		" The number of pixels must be a multiple of 4."
 	},
 	{"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS,
 		"cairo_to_gtk(array)\n"
@@ -427,5 +419,6 @@ static PyMethodDef spuhelper_methods[] =
 
 PyMODINIT_FUNC initspuhelper(void)
   {
-	(void)Py_InitModule("spuhelper", spuhelper_methods);
+	(void)Py_InitModule3("spuhelper", spuhelper_methods,
+		"helper functions for dvd_menu_animator script");
   } /*initspuhelper*/
