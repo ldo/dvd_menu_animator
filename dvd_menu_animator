@@ -337,52 +337,31 @@ def AnalyzeImage() :
 def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image."""
 	if LoadedImage.Contents != None :
+		Pixels, ImageDrawSize, RowStride = RenderImagePix()
 		if False :
-			if MainWindow.ImageDraw == None :
-				MainWindow.ImageDraw = MainWindow.ImageDisplay.window.cairo_create()
-			#end if
-			ImageDrawSize = MainWindow.ImageDisplay.window.get_size()
-			MainWindow.ImageDraw.identity_matrix()
-			MainWindow.ImageDraw.reset_clip()
-			MainWindow.ImageDraw.rectangle(*((0, 0) + ImageDrawSize))
-			MainWindow.ImageDraw.set_source_rgb(1, 1, 1)
-			MainWindow.ImageDraw.fill()
-			ScaleFactor = min \
-			  (
-				ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-				ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-			  ) # make sure it's all visible
-			MainWindow.ImageDraw.scale(ScaleFactor, ScaleFactor)
-			svg = rsvg.Handle(data = ImageAsSVG())
-			svg.render_cairo(MainWindow.ImageDraw) # causes X errors now
-		else :
-			# fudge to avoid X errors by rendering SVG to offscreen
-			Pixels, ImageDrawSize, RowStride = RenderImagePix()
-			if False :
-				for Row in range(0, ImageDrawSize[1]) :
-					# need to rearrange pixel components between Cairo and GTK formats.
-					# Is this endian-dependent?
-					RowBase = Row * RowStride
-					for Col in range(0, ImageDrawSize[0]) :
-						ColBase = RowBase + Col * 4
-						Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
-					#end for
+			for Row in range(0, ImageDrawSize[1]) :
+				# need to rearrange pixel components between Cairo and GTK formats.
+				# Is this endian-dependent?
+				RowBase = Row * RowStride
+				for Col in range(0, ImageDrawSize[0]) :
+					ColBase = RowBase + Col * 4
+					Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
 				#end for
-			else :
-				spuhelper.cairo_to_gtk(Pixels)
-			#end if
-			Offscreen = gtk.gdk.pixbuf_new_from_data \
-			  (
-				data = Pixels.tostring(),
-				colorspace = gtk.gdk.COLORSPACE_RGB, # hope this matches the Cairo layout
-				has_alpha = True,
-				bits_per_sample = 8,
-				width = ImageDrawSize[0],
-				height = ImageDrawSize[1],
-				rowstride = RowStride
-			  )
-			MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
+			#end for
+		else :
+			spuhelper.cairo_to_gtk(Pixels)
 		#end if
+		Offscreen = gtk.gdk.pixbuf_new_from_data \
+		  (
+			data = Pixels.tostring(),
+			colorspace = gtk.gdk.COLORSPACE_RGB, # hope this matches the Cairo layout
+			has_alpha = True,
+			bits_per_sample = 8,
+			width = ImageDrawSize[0],
+			height = ImageDrawSize[1],
+			rowstride = RowStride
+		  )
+		MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
 	#end if
 #end DisplayImage
 
@@ -512,12 +491,6 @@ def SelectLoadImage(TheWindow) :
 	#end if
 #end SelectLoadImage
 
-def ImageRedisplay(ImageDisplay, TheEvent) :
-	sys.stderr.write("expose event received\n") # debug
-	DisplayImage() # why doesn't this work?
-	return True
-#end ImageRedisplay
-
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
 	FindButtons()
@@ -546,15 +519,7 @@ def SetupMainWindow() :
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
-	if False :
-		MainWindow.ImageDisplay = BoxPack(gtk.DrawingArea(), MiddleBox)
-		MainWindow.ImageDisplay.set_app_paintable(True) # ?
-		MainWindow.ImageDisplay.connect("expose-event", ImageRedisplay)
-		MainWindow.ImageDisplay.set_size_request(640, 480)
-		MainWindow.ImageDraw = None # can't create yet
-	else :
-		MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
-	#end if
+	MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
 	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
 	List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
