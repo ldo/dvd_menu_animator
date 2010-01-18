@@ -46,11 +46,11 @@ static PyObject * spuhelper_cairo_to_gtk
 static PyMethodDef spuhelper_methods[] =
   {
 	{"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS,
-		"cairo_to_gtk(address, nrpixels)\n"
+		"cairo_to_gtk(address, nrbytes)\n"
 		"converts a buffer of RGBA-format pixels from Cairo (native-endian) ordering"
 		" to GTK Pixbuf (big-endian) ordering."
 	},
-	{0, 0, 0, 0}
+	{0, 0, 0, 0} /* marks end of list */
   };
 
 PyMODINIT_FUNC initspuhelper(void)
