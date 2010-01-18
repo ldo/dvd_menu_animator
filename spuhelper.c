@@ -78,12 +78,15 @@ static PyObject * spuhelper_index_image
 	PyObject * self,
 	PyObject * args
   )
+  /* computes a histogram of pixel frequency on an image, and also generates a
+	two-bit-per-pixel indexed version of the image if possible. */
   {
 	const unsigned long count_factor = 50;
+	  /* ignore excess colours provided they make up no more than a proportion
+		1 / count_factor of the pixels */
 	PyObject * Result = 0;
 	PyObject * ArrayModule = 0;
 	PyObject * SrcArray = 0;
-	PyObject * TheBufferInfo = 0;
 	unsigned long pixaddr, nrpixbytes, nrpixels, pixlen;
 	const uint32_t * pixels;
 	unsigned long nrhistentries = 0, maxhistentries, histindex;
@@ -98,11 +101,21 @@ static PyObject * spuhelper_index_image
 		if (!PyArg_ParseTuple(args, "O", &SrcArray))
 			break;
 		Py_INCREF(SrcArray);
-		TheBufferInfo = PyObject_CallMethod(SrcArray, "buffer_info", "");
-		if (TheBufferInfo == 0)
-			break;
-		if (!PyArg_ParseTuple(TheBufferInfo, "kk", &pixaddr, &nrpixbytes))
-			break;
+		  {
+			PyObject * TheBufferInfo = 0;
+			do /*once*/
+			  {
+				TheBufferInfo = PyObject_CallMethod(SrcArray, "buffer_info", "");
+				if (TheBufferInfo == 0)
+					break;
+				if (!PyArg_ParseTuple(TheBufferInfo, "kk", &pixaddr, &nrpixbytes))
+					break;
+			  }
+			while (false);
+			Py_XDECREF(TheBufferInfo);
+			if (PyErr_Occurred())
+				break;
+		  }
 		pixels = (const uint32_t *)pixaddr;
 		nrpixels = nrpixbytes >> 2;
 		pixlen = nrpixels;
@@ -350,11 +363,195 @@ static PyObject * spuhelper_index_image
 	Py_XDECREF(HistTuple);
 	Py_XDECREF(ResultArray);
 	free(histogram);
-	Py_XDECREF(TheBufferInfo);
 	Py_XDECREF(SrcArray);
 	Py_XDECREF(ArrayModule);
 	return Result;
   } /*spuhelper_index_image*/
+
+static PyObject * spuhelper_expand_image
+  (
+	PyObject * self,
+	PyObject * args
+  )
+  /* expands a 2-bit-per-pixel image, substituting the specified colours. */
+  {
+	PyObject * Result = 0;
+	PyObject * SrcArray = 0;
+	PyObject * ColorTuple = 0;
+	PyObject * ArrayModule = 0;
+	PyObject * DstArray = 0;
+	unsigned long srcpixaddr, nrsrcpixbytes;
+	uint32_t colors[4];
+	do /*once*/
+	  {
+		if (!PyArg_ParseTuple(args, "OO", &SrcArray, &ColorTuple))
+			break;
+		Py_INCREF(SrcArray);
+		Py_INCREF(ColorTuple);
+		ArrayModule = PyImport_ImportModule("array");
+		if (ArrayModule == 0)
+			break;
+		  {
+			PyObject * TheBufferInfo = 0;
+			do /*once*/
+			  {
+				TheBufferInfo = PyObject_CallMethod(SrcArray, "buffer_info", "");
+				if (TheBufferInfo == 0)
+					break;
+				if (!PyArg_ParseTuple(TheBufferInfo, "kk", &srcpixaddr, &nrsrcpixbytes))
+					break;
+			  }
+			while (false);
+			Py_XDECREF(TheBufferInfo);
+			if (PyErr_Occurred())
+				break;
+		  }
+		  {
+		  /* parse the colour specifications */
+			PyObject * TheColors[4] = {0, 0, 0, 0};
+			unsigned int i, channel[4];
+			do /*once*/
+			  {
+				if
+				  (
+					!PyArg_ParseTuple
+					  (
+						ColorTuple,
+						"OOOO",
+						TheColors + 0,
+						TheColors + 1,
+						TheColors + 2,
+						TheColors + 3
+					  )
+				  )
+					break;
+				for (i = 0; i < 4; ++i)
+				  {
+					Py_INCREF(TheColors[i]);
+				  } /*for*/
+				for (i = 0;;)
+				  {
+					if (i == 4)
+						break;
+					if
+					  (
+						!PyArg_ParseTuple
+						  (
+							TheColors[i],
+							"iiii",
+							channel + 1, /* R */
+							channel + 2, /* G */
+							channel + 3, /* B */
+							channel + 0 /* A */
+						  )
+					  )
+						break;
+					if
+					  (
+							channel[0] > 255
+						||
+							channel[1] > 255
+						||
+							channel[2] > 255
+						||
+							channel[3] > 255
+					  )
+					  {
+						PyErr_SetString
+						  (
+							PyExc_ValueError,
+							"colour components must be in [0 .. 255]"
+						  );
+						break;
+					  } /*if*/
+					colors[i] =
+							channel[0] << 24
+						|
+							channel[1] << 16
+						|
+							channel[2] << 8
+						|
+							channel[3];
+					++i;
+				  } /*for*/
+				if (PyErr_Occurred())
+					break;
+			  }
+			while (false);
+			for (i = 0; i < 4; ++i)
+			  {
+				Py_XDECREF(TheColors[i]);
+			  } /*for*/
+			if (PyErr_Occurred())
+				break;
+		  }
+		DstArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
+		if (DstArray == 0)
+			break;
+		  {
+		  /* expand the pixels */
+			const unsigned long MaxBufPixels = 128 /* convenient buffer size to avoid heap allocation */;
+			uint32_t PixBuf[MaxBufPixels];
+			const uint8_t * SrcPixels = (const uint8_t *)srcpixaddr;
+			unsigned long NrBufPixels, NrSrcPixels, SrcPixIndex;
+			unsigned int SrcPix;
+			NrSrcPixels = nrsrcpixbytes << 2;
+			SrcPixIndex = 0;
+			NrBufPixels = 0;
+			for (;;)
+			  {
+				if (NrSrcPixels == 0 || NrBufPixels == MaxBufPixels)
+				  {
+					PyObject * BufString = 0;
+					PyObject * Result = 0;
+					do /*once*/
+					  {
+						if (NrBufPixels == 0)
+							break; /* nothing to flush out */
+						BufString = PyString_FromStringAndSize((const char *)PixBuf, NrBufPixels * 4);
+						if (BufString == 0)
+							break;
+						Result = PyObject_CallMethod(DstArray, "fromstring", "O", BufString);
+						if (Result == 0)
+							break;
+					  }
+					while (false);
+					Py_XDECREF(Result);
+					Py_XDECREF(BufString);
+					if (PyErr_Occurred())
+						break;
+					if (NrSrcPixels == 0)
+						break;
+					NrBufPixels = 0;
+				  } /*if*/
+				if (SrcPixIndex == 0)
+				  {
+					SrcPix = *SrcPixels;
+				  } /*if*/
+				PixBuf[NrBufPixels] = colors[SrcPix >> SrcPixIndex * 2 & 3];
+				++NrBufPixels;
+				++SrcPixIndex;
+				if (SrcPixIndex == 4)
+				  {
+					++SrcPixels;
+					SrcPixIndex = 0;
+				  } /*if*/
+				--NrSrcPixels;
+			  } /*for*/
+			if (PyErr_Occurred())
+				break;
+		  }
+	  /* all done */
+		Result = DstArray;
+		DstArray = 0; /* so I don't dispose of it yet */
+	  }
+	while (false);
+	Py_XDECREF(DstArray);
+	Py_XDECREF(ArrayModule);
+	Py_XDECREF(ColorTuple);
+	Py_XDECREF(SrcArray);
+	return Result;
+  } /*spuhelper_expand_image*/
 
 static PyObject * spuhelper_cairo_to_gtk
   (
@@ -362,7 +559,8 @@ static PyObject * spuhelper_cairo_to_gtk
 	PyObject * args
   )
   /* converts a buffer of RGBA-format pixels from Cairo (native-endian) ordering to
-	GTK Pixbuf (big-endian) ordering. */
+	GTK Pixbuf (big-endian) ordering. I guess this function isn't directly related
+	to the other two, but where else to put it? */
   {
 	PyObject * result = 0;
 	PyObject * TheArray = 0;
@@ -408,6 +606,12 @@ static PyMethodDef spuhelper_methods[] =
 		" returns a tuple of 2 elements, the first being a new array object containing"
 		" 2 bits per pixel, and the second being a tuple of corresponding colours."
 		" The number of pixels must be a multiple of 4."
+	},
+	{"expand_image", spuhelper_expand_image, METH_VARARGS,
+		"expand_image(array, colors)\n"
+		"expands a 2-bit-per-pixel image as previously generated by index_image,"
+		" substituting the specified colours. Returns an array object containing"
+		" 32 bits per pixel in Cairo (native-endian) ordering."
 	},
 	{"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS,
 		"cairo_to_gtk(array)\n"
