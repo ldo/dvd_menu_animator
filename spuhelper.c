@@ -69,6 +69,39 @@ static void sort_hist_by_count
 	  } /*while*/
   } /*sort_hist_by_count*/
 
+static void GetBufferInfo
+  (
+	PyObject * FromArray,
+	unsigned long * addr,
+	unsigned long * len
+  )
+  /* returns the address and length of the data in a Python array object. */
+  {
+	PyObject * TheBufferInfo = 0;
+	PyObject * AddrObj = 0;
+	PyObject * LenObj = 0;
+	do /*once*/
+	  {
+		TheBufferInfo = PyObject_CallMethod(FromArray, "buffer_info", "");
+		if (TheBufferInfo == 0)
+			break;
+		AddrObj = PyTuple_GetItem(TheBufferInfo, 0);
+		LenObj = PyTuple_GetItem(TheBufferInfo, 1);
+		if (PyErr_Occurred())
+			break;
+		Py_INCREF(AddrObj);
+		Py_INCREF(LenObj);
+		*addr = PyInt_AsUnsignedLongMask(AddrObj);
+		*len = PyInt_AsUnsignedLongMask(LenObj);
+		if (PyErr_Occurred())
+			break;
+	  }
+	while (false);
+	Py_XDECREF(AddrObj);
+	Py_XDECREF(LenObj);
+	Py_XDECREF(TheBufferInfo);
+  } /*GetBufferInfo*/
+
 /*
 	User-visible stuff
 */
@@ -101,21 +134,9 @@ static PyObject * spuhelper_index_image
 		if (!PyArg_ParseTuple(args, "O", &SrcArray))
 			break;
 		Py_INCREF(SrcArray);
-		  {
-			PyObject * TheBufferInfo = 0;
-			do /*once*/
-			  {
-				TheBufferInfo = PyObject_CallMethod(SrcArray, "buffer_info", "");
-				if (TheBufferInfo == 0)
-					break;
-				if (!PyArg_ParseTuple(TheBufferInfo, "kk", &pixaddr, &nrpixbytes))
-					break;
-			  }
-			while (false);
-			Py_XDECREF(TheBufferInfo);
-			if (PyErr_Occurred())
-				break;
-		  }
+		GetBufferInfo(SrcArray, &pixaddr, &nrpixbytes);
+		if (PyErr_Occurred())
+			break;
 		pixels = (const uint32_t *)pixaddr;
 		nrpixels = nrpixbytes >> 2;
 		pixlen = nrpixels;
@@ -391,39 +412,20 @@ static PyObject * spuhelper_expand_image
 		ArrayModule = PyImport_ImportModule("array");
 		if (ArrayModule == 0)
 			break;
-		  {
-			PyObject * TheBufferInfo = 0;
-			do /*once*/
-			  {
-				TheBufferInfo = PyObject_CallMethod(SrcArray, "buffer_info", "");
-				if (TheBufferInfo == 0)
-					break;
-				if (!PyArg_ParseTuple(TheBufferInfo, "kk", &srcpixaddr, &nrsrcpixbytes))
-					break;
-			  }
-			while (false);
-			Py_XDECREF(TheBufferInfo);
-			if (PyErr_Occurred())
-				break;
-		  }
+		GetBufferInfo(SrcArray, &srcpixaddr, &nrsrcpixbytes);
+		if (PyErr_Occurred())
+			break;
 		  {
 		  /* parse the colour specifications */
 			PyObject * TheColors[4] = {0, 0, 0, 0};
-			unsigned int i, channel[4];
+			unsigned int i, j, channel[4];
 			do /*once*/
 			  {
-				if
-				  (
-					!PyArg_ParseTuple
-					  (
-						ColorTuple,
-						"OOOO",
-						TheColors + 0,
-						TheColors + 1,
-						TheColors + 2,
-						TheColors + 3
-					  )
-				  )
+				for (i = 0; i < 4; ++i)
+				  {
+					TheColors[i] = PyTuple_GetItem(ColorTuple, i);
+				  } /*for*/
+				if (PyErr_Occurred())
 					break;
 				for (i = 0; i < 4; ++i)
 				  {
@@ -433,37 +435,30 @@ static PyObject * spuhelper_expand_image
 				  {
 					if (i == 4)
 						break;
-					if
-					  (
-						!PyArg_ParseTuple
-						  (
-							TheColors[i],
-							"iiii",
-							channel + 1, /* R */
-							channel + 2, /* G */
-							channel + 3, /* B */
-							channel + 0 /* A */
-						  )
-					  )
-						break;
-					if
-					  (
-							channel[0] > 255
-						||
-							channel[1] > 255
-						||
-							channel[2] > 255
-						||
-							channel[3] > 255
-					  )
+					for (j = 0;;)
 					  {
-						PyErr_SetString
-						  (
-							PyExc_ValueError,
-							"colour components must be in [0 .. 255]"
-						  );
+						if (j == 4)
+							break;
+						PyObject * ColorObj = PyTuple_GetItem(TheColors[i], j);
+						if (PyErr_Occurred())
+							break;
+						const long chanval = PyInt_AsLong(ColorObj);
+						if (PyErr_Occurred())
+							break;
+						if (chanval < 0 || chanval > 255)
+						  {
+							PyErr_SetString
+							  (
+								PyExc_ValueError,
+								"colour components must be in [0 .. 255]"
+							  );
+							break;
+						  } /*if*/
+						channel[(j + 1) % 4] = chanval;
+						++j;
+					  } /*for*/
+					if (PyErr_Occurred())
 						break;
-					  } /*if*/
 					colors[i] =
 							channel[0] << 24
 						|
@@ -564,7 +559,6 @@ static PyObject * spuhelper_cairo_to_gtk
   {
 	PyObject * result = 0;
 	PyObject * TheArray = 0;
-	PyObject * TheBufferInfo = 0;
 	unsigned long pixaddr, pixlen;
 	uint8_t * pixels;
 	do /*once*/
@@ -572,10 +566,8 @@ static PyObject * spuhelper_cairo_to_gtk
 		if (!PyArg_ParseTuple(args, "O", &TheArray))
 			break;
 		Py_INCREF(TheArray);
-		TheBufferInfo = PyObject_CallMethod(TheArray, "buffer_info", "");
-		if (TheBufferInfo == 0)
-			break;
-		if (!PyArg_ParseTuple(TheBufferInfo, "kk", &pixaddr, &pixlen))
+		GetBufferInfo(TheArray, &pixaddr, &pixlen);
+		if (PyErr_Occurred())
 			break;
 		pixels = (uint8_t *)pixaddr;
 		pixlen >>= 2;
@@ -593,7 +585,6 @@ static PyObject * spuhelper_cairo_to_gtk
 		result = Py_None;
 	  }
 	while (false);
-	Py_XDECREF(TheBufferInfo);
 	Py_XDECREF(TheArray);
 	return result;
   } /*spuhelper_cairo_to_gtk*/
