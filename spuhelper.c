@@ -24,7 +24,6 @@ static PyObject * spuhelper_cairo_to_gtk
 	  {
 		if (!PyArg_ParseTuple(args, "kk", &pixaddr, &pixlen))
 			break;
-		fprintf(stderr, "cairo_to_gtk: pixaddr = %016lx, pixlen = %ld\n", pixaddr, pixlen);
 		pixels = (uint8_t *)pixaddr;
 		pixlen >>= 2;
 		while (pixlen > 0)
