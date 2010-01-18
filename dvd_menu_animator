@@ -356,7 +356,7 @@ def DisplayImage() :
 					#end for
 				#end for
 			else :
-				spuhelper.cairo_to_gtk(*Pixels.buffer_info())
+				spuhelper.cairo_to_gtk(Pixels)
 			#end if
 			Offscreen = gtk.gdk.pixbuf_new_from_data \
 			  (
