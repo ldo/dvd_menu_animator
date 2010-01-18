@@ -9,23 +9,83 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*
+	Miscellaneous useful stuff
+*/
+
+typedef struct
+  {
+	unsigned long count;
+	uint32_t pixel;
+	unsigned short index;
+  } histentry;
+
+static void sort_hist_by_count
+  (
+	histentry * histogram,
+	unsigned long nrhistentries
+  )
+  /* does a Shellsort sort on the elements in a list. This is
+	not a stable sort. */
+  {
+	ulong i, j, k, l, m;
+	histentry swaptemp;
+	m = 1;
+	while (m < nrhistentries)
+	  {
+		m = m + m;
+	  } /*while*/
+	m =
+			(m - 1)
+			  /* to ensure that successive increments are relatively prime,
+				as per Knuth vol 3 page 91 */
+		>>
+			1;
+	if (m == 0 && nrhistentries > 1)
+	  {
+	  /* do at least one pass when sorting 2 elements */
+		m = 1;
+	  } /*if*/
+	while (m > 0)
+	  {
+		k = nrhistentries - m;
+		for (j = 0; j < k; ++j)
+		  {
+			i = j;
+			for (;;)
+			  {
+				l = i + m;
+				if (histogram[i].count >= histogram[l].count)
+					break;
+				swaptemp = histogram[i];
+				histogram[i] = histogram[l];
+				histogram[l] = swaptemp;
+				if (i <= m)
+					break;
+				i -= m;
+			  } /*for*/
+		  } /*for*/
+		m >>= 1;
+	  } /*while*/
+  } /*sort_hist_by_count*/
+
+/*
+	User-visible stuff
+*/
+
 static PyObject * spuhelper_index_image
   (
 	PyObject * self,
 	PyObject * args
   )
   {
+	const unsigned long count_factor = 50;
 	PyObject * Result = 0;
 	PyObject * ArrayModule = 0;
 	PyObject * SrcArray = 0;
 	PyObject * TheBufferInfo = 0;
-	unsigned long pixaddr, nrpixbytes, pixlen;
+	unsigned long pixaddr, nrpixbytes, nrpixels, pixlen;
 	const uint32_t * pixels;
-	typedef struct
-	  {
-		uint32_t pixel;
-		unsigned long count;
-	  } histentry;
 	unsigned long nrhistentries = 0, maxhistentries, histindex;
 	histentry * histogram = 0;
 	PyObject * ResultArray = 0;
@@ -44,7 +104,8 @@ static PyObject * spuhelper_index_image
 		if (!PyArg_ParseTuple(TheBufferInfo, "kk", &pixaddr, &nrpixbytes))
 			break;
 		pixels = (const uint32_t *)pixaddr;
-		pixlen = nrpixbytes >> 2;
+		nrpixels = nrpixbytes >> 2;
+		pixlen = nrpixels;
 		for (;;)
 		  {
 			if (pixlen == 0)
@@ -100,68 +161,151 @@ static PyObject * spuhelper_index_image
 		  } /*for*/
 		if (PyErr_Occurred())
 			break;
-		if (nrhistentries <= 4)
+		sort_hist_by_count(histogram, nrhistentries);
+		if
+		  (
+				nrhistentries <= 4
+			||
+						nrpixels
+					/
+						(
+							nrpixels
+						-
+							(
+								histogram[0].count
+							+
+								histogram[1].count
+							+
+								histogram[2].count
+							+
+								histogram[3].count
+							)
+						) /* won't be zero */
+				>=
+					count_factor
+		  )
 		  {
-			const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
-			const size_t MaxPixels = PixBufSize * 4; /* 2 bits per pixel */
-			uint8_t PixBuf[PixBufSize];
-			size_t NrPixels;
-			ResultArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
-			if (ResultArray == 0)
-				break;
-			pixels = (const uint32_t *)pixaddr;
-			pixlen = nrpixbytes >> 2;
-			NrPixels = 0;
-			for (;;)
 			  {
-			  /* extend ResultArray by a bunch of converted pixels at a time */
-				if (pixlen == 0 || NrPixels == MaxPixels)
+				if (nrhistentries > 0)
 				  {
-					PyObject * BufString = 0;
-					PyObject * Result = 0;
-					do /*once*/
+					histogram[0].index = 0;
+					if (nrhistentries > 1)
 					  {
-						if (NrPixels == 0)
-							break; /* nothing to flush out */
-						if (NrPixels % 4 != 0)
+						histogram[1].index = 1;
+						if (nrhistentries > 2)
 						  {
-						  /* fill out unused part of byte with zeroes */
-							PixBuf[NrPixels / 4] &= ~(0xff << NrPixels % 4 * 2);
+							histogram[2].index = 2;
+							if (nrhistentries > 3)
+							  {
+								histogram[3].index = 3;
+							  } /*if*/
 						  } /*if*/
-						BufString = PyString_FromStringAndSize((const char *)PixBuf, (NrPixels + 3) / 4);
-						if (BufString == 0)
-							break;
-						Result = PyObject_CallMethod(ResultArray, "fromstring", "O", BufString);
-						if (Result == 0)
-							break;
-					  }
-					while (false);
-					Py_XDECREF(Result);
-					Py_XDECREF(BufString);
-					if (PyErr_Occurred())
-						break;
-					if (pixlen == 0)
-						break;
+					  } /*if*/
 				  } /*if*/
-				const uint32_t thispixel = *pixels;
-				for (histindex = 0; histogram[histindex].pixel != thispixel; ++histindex)
-				  /* guaranteed to find pixel index */;
-				if (NrPixels % 4 == 0)
+				for (histindex = 4; histindex < nrhistentries; ++histindex)
 				  {
-				  /* starting new byte */
-					PixBuf[NrPixels / 4] = 0; /* ensure there's no junk in it */
-				  } /*if*/
-				PixBuf[NrPixels / 4] |= histindex << NrPixels % 4 * 2;
-				++NrPixels;
-				++pixels;
-				--pixlen;
-			  } /*for*/
+				  /* coalesce remaining colours to nearest ones among the first four */
+					unsigned long foundindex, bestindex, bestweight;
+					for (foundindex = 0; foundindex < 4; ++foundindex)
+					  {
+						const uint32_t
+							thispixel = histogram[histindex].pixel,
+							thatpixel = histogram[foundindex].pixel;
+						const long
+							delta_a = (long)(thispixel >> 24 & 255) - (long)(thatpixel >> 24 & 255),
+							delta_r = (long)(thispixel >> 16 & 255) - (long)(thatpixel >> 16 & 255),
+							delta_g = (long)(thispixel >> 8 & 255) - (long)(thatpixel >> 8 & 255),
+							delta_b = (long)(thispixel & 255) - (long)(thatpixel & 255);
+						const long weight =
+								delta_a * delta_a
+							+
+								delta_r * delta_r
+							+
+								delta_g * delta_g
+							+
+								delta_b * delta_b;
+						if (foundindex == 0 || weight < bestweight)
+						  {
+							bestindex = foundindex;
+							bestweight = weight;
+						  } /*if*/
+					  } /*for*/
+					histogram[histindex].index = bestindex;
+				  } /*for*/
+			  }
+			  { /* debug */
+				fprintf(stderr, "sorted histogram:\n");
+				for (histindex = 0; histindex < nrhistentries; ++histindex)
+				  {
+					fprintf(stderr, "%d(%d) : %08x(%d)\n",
+						(unsigned int)histindex, histogram[histindex].index,
+						histogram[histindex].pixel, (unsigned int)histogram[histindex].count);
+				  } /*for*/
+			  }
+			  {
+			  /* generate indexed version of image */
+				const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
+				const size_t MaxPixels = PixBufSize * 4; /* 2 bits per pixel */
+				uint8_t PixBuf[PixBufSize];
+				size_t BufPixels;
+				ResultArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
+				if (ResultArray == 0)
+					break;
+				pixels = (const uint32_t *)pixaddr;
+				pixlen = nrpixels;
+				BufPixels = 0;
+				for (;;)
+				  {
+				  /* extend ResultArray by a bunch of converted pixels at a time */
+					if (pixlen == 0 || BufPixels == MaxPixels)
+					  {
+						PyObject * BufString = 0;
+						PyObject * Result = 0;
+						do /*once*/
+						  {
+							if (BufPixels == 0)
+								break; /* nothing to flush out */
+							if (BufPixels % 4 != 0)
+							  {
+							  /* fill out unused part of byte with zeroes--actually shouldn't occur */
+								PixBuf[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
+							  } /*if*/
+							BufString = PyString_FromStringAndSize((const char *)PixBuf, (BufPixels + 3) / 4);
+							if (BufString == 0)
+								break;
+							Result = PyObject_CallMethod(ResultArray, "fromstring", "O", BufString);
+							if (Result == 0)
+								break;
+						  }
+						while (false);
+						Py_XDECREF(Result);
+						Py_XDECREF(BufString);
+						if (PyErr_Occurred())
+							break;
+						if (pixlen == 0)
+							break;
+						BufPixels = 0;
+					  } /*if*/
+					const uint32_t thispixel = *pixels;
+					for (histindex = 0; histogram[histindex].pixel != thispixel; ++histindex)
+					  /* guaranteed to find pixel index */;
+					if (BufPixels % 4 == 0)
+					  {
+					  /* starting new byte */
+						PixBuf[BufPixels / 4] = 0; /* ensure there's no junk in it */
+					  } /*if*/
+					PixBuf[BufPixels / 4] |= histogram[histindex].index << BufPixels % 4 * 2;
+					++BufPixels;
+					++pixels;
+					--pixlen;
+				  } /*for*/
+			  }
 			if (PyErr_Occurred())
 				break;
 		  }
 		else
 		  {
-		  /* don't bother building an indexed version of image */
+		  /* too many different colours, don't bother building an indexed version of image */
 			Py_INCREF(Py_None);
 			ResultArray = Py_None;
 		  } /*if*/
