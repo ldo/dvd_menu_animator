@@ -25,6 +25,8 @@ import gobject
 import gtk
 import getopt
 
+import spuhelper
+
 #+
 # Miscellaneous useful stuff
 #-
@@ -343,15 +345,19 @@ def DisplayImage() :
 			svg = rsvg.Handle(data = ImageAsSVG())
 			svg.render_cairo(Offscreen)
 			OffscreenPix.flush()
-			for Row in range(0, ImageDrawSize[1]) :
-				# need to rearrange pixel components between Cairo and GTK formats.
-				# Is this endian-dependent?
-				RowBase = Row * RowStride
-				for Col in range(0, ImageDrawSize[0]) :
-					ColBase = RowBase + Col * 4
-					Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
+			if False :
+				for Row in range(0, ImageDrawSize[1]) :
+					# need to rearrange pixel components between Cairo and GTK formats.
+					# Is this endian-dependent?
+					RowBase = Row * RowStride
+					for Col in range(0, ImageDrawSize[0]) :
+						ColBase = RowBase + Col * 4
+						Pixels[ColBase + 0], Pixels[ColBase + 1], Pixels[ColBase + 2], Pixels[ColBase + 3] = Pixels[ColBase + 2], Pixels[ColBase + 1], Pixels[ColBase + 0], Pixels[ColBase + 3]
+					#end for
 				#end for
-			#end for
+			else :
+				spuhelper.cairo_to_gtk(*Pixels.buffer_info())
+			#end if
 			Offscreen = gtk.gdk.pixbuf_new_from_data \
 			  (
 				data = Pixels.tostring(),
