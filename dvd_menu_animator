@@ -272,7 +272,7 @@ def RenderImagePix() :
 
 def AnalyzeImage() :
 	"""hides the button layer and determines what colours are present in the rest
-	of the image. Uses the ImageMagick "identify" program."""
+	of the image."""
 	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
 	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
 		LayerID = Layer.get("id")
@@ -294,14 +294,13 @@ def AnalyzeImage() :
 	for Color in Colors :
 		MainWindow.ColorsNormalList.append((Color[0],))
 	#end for
-	# more TBD
+	# more TBD using LoadedImage.ColorShowing
 	if IndexedImage == None :
 		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % len(Colors)
 	else :
 		Msg = ""
 	#end if
 	MainWindow.StatusMsg.set_markup(Msg)
-	# more TBD
 #end AnalyzeImage
 
 def DisplayImage() :
@@ -368,6 +367,7 @@ def LoadImage(FileName) :
 			raise Failure("Need at least 2 layers, one for buttons and the rest for the image.")
 		#end if
 		# passed all validation checks
+		MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
 		LoadedImage.FileName = FileName
 		LoadedImage.Contents = NewContents
 		LoadedImage.SrcDimensions = NewSrcDimensions
@@ -379,6 +379,12 @@ def LoadImage(FileName) :
 			MainWindow.LayerList.append(Layer)
 		#end for
 		LoadedImage.Layers = NewLayers
+		LoadedImage.ColorShowing = 0
+		for Index, Button in enumerate(MainWindow.ColorButtonGroup.get_group()) :
+			Button.set_active(Button == MainWindow.ColorButtonGroup)
+			Button.set_flags(gtk.SENSITIVE)
+		#end for
+		MainWindow.Loading = False
 		AnalyzeImage()
 		# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 		DisplayImage()
@@ -456,6 +462,15 @@ def LayerSelectionChanged(TheSelection) :
 	DisplayImage()
 #end LayerSelectionChanged
 
+def ColorDisplayChanged(TheButton, Index) :
+	sys.stderr.write("button %d active %d\n" % (Index, TheButton.get_active())) # debug
+	if not MainWindow.Loading and TheButton.get_active() :
+		LoadedImage.ColorShowing = Index
+		AnalyzeImage()
+		DisplayImage()
+	#end if
+#end ColorDisplayChanged
+
 #+
 # Mainline
 #-
@@ -479,7 +494,22 @@ def SetupMainWindow() :
 	MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
 	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
+	RadioBox = BoxPack(gtk.VBox(False, CommonBoxMargin), List1Box)
 	List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
+	MainWindow.ColorButtonGroup = None
+	MainWindow.Loading = True
+	LoadedImage.ColorShowing = 0
+	BoxPack(gtk.Label("Using Colours:"), RadioBox)
+	for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected")) :
+		Button = BoxPack(gtk.RadioButton(MainWindow.ColorButtonGroup, Label), RadioBox)
+		Button.set_active(MainWindow.ColorButtonGroup == None)
+		if MainWindow.ColorButtonGroup == None :
+			MainWindow.ColorButtonGroup = Button
+		else :
+			Button.unset_flags(gtk.SENSITIVE) # until an image is loaded
+		#end if
+		Button.connect("toggled", ColorDisplayChanged, Index)
+	#end for
 	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
 	  # first col is display name, second is layer ID
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
