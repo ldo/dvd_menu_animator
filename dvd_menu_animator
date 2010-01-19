@@ -231,48 +231,48 @@ def ImageAsSVG() :
 def RenderImagePix() :
 	"""allocates an array object and fills it with a pixel representation of the
 	loaded image."""
-	ImageDrawSize = ((720, 540), (960, 540))[LoadedImage.Widescreen]
-	if hasattr(cairo, "format_stride_for_width") :
-		RowStride = cairo.format_stride_for_width(cairo.FORMAT_ARGB32, ImageDrawSize[0])
-	else :
-		RowStride = ImageDrawSize[0] * 4
-	#end if
 	Pixels = array.array \
 	  (
 		"B",
 			(255, 255, 255, 255)
 		*
-			(RowStride // 4 * ImageDrawSize[1])
+			(LoadedImage.RowStride // 4 * LoadedImage.ImageDrawSize[1])
 	  )
 	OffscreenPix = cairo.ImageSurface.create_for_data \
 	  (
 		Pixels, # data
 		cairo.FORMAT_ARGB32, # format
-		ImageDrawSize[0], # width
-		ImageDrawSize[1], # height
-		RowStride # stride
+		LoadedImage.ImageDrawSize[0], # width
+		LoadedImage.ImageDrawSize[1], # height
+		LoadedImage.RowStride # stride
 	  )
 	Offscreen = cairo.Context(OffscreenPix)
 	Offscreen.identity_matrix()
 	Offscreen.reset_clip()
-	Offscreen.rectangle(*((0, 0) + ImageDrawSize))
+	Offscreen.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
 	Offscreen.set_source_rgba(1, 1, 1, 1)
 	Offscreen.fill()
 	ScaleFactor = min \
 	  (
-		ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-		ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+		LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+		LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
 	  ) # make sure it's all visible
 	Offscreen.scale(ScaleFactor, ScaleFactor)
 	svg = rsvg.Handle(data = ImageAsSVG())
 	svg.render_cairo(Offscreen)
 	OffscreenPix.flush()
-	return (Pixels, ImageDrawSize, RowStride)
+	return Pixels
 #end RenderImagePix
 
 def AnalyzeImage() :
 	"""hides the button layer and determines what colours are present in the rest
 	of the image."""
+	LoadedImage.ImageDrawSize = ((720, 540), (960, 540))[LoadedImage.Widescreen]
+	if hasattr(cairo, "format_stride_for_width") :
+		LoadedImage.RowStride = cairo.format_stride_for_width(cairo.FORMAT_ARGB32, LoadedImage.ImageDrawSize[0])
+	else :
+		LoadedImage.RowStride = LoadedImage.ImageDrawSize[0] * 4
+	#end if
 	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
 	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
 		LayerID = Layer.get("id")
@@ -289,14 +289,28 @@ def AnalyzeImage() :
 			  )
 		#end if
 	#end for
-	IndexedImage, Colors = spuhelper.index_image(RenderImagePix()[0])
-	MainWindow.ColorsNormalList.clear()
-	for Color in Colors :
-		MainWindow.ColorsNormalList.append((Color[0],))
+	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix())
+	for \
+		ColorList \
+	in \
+		(
+			MainWindow.ColorsNormalList,
+			MainWindow.ColorsHighlightedList,
+			MainWindow.ColorsSelectedList,
+		) \
+	:
+		ColorList.clear()
+		for Color in LoadedImage.Colors :
+			ColorList.append((Color[0],))
+		#end for
 	#end for
-	# more TBD using LoadedImage.ColorShowing
-	if IndexedImage == None :
-		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % len(Colors)
+	if LoadedImage.IndexedImage == None :
+		Msg = \
+			(
+				"<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
+			%
+				len(LoadedImage.Colors)
+			)
 	else :
 		Msg = ""
 	#end if
@@ -306,17 +320,23 @@ def AnalyzeImage() :
 def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image."""
 	if LoadedImage.Contents != None :
-		Pixels, ImageDrawSize, RowStride = RenderImagePix()
+		if LoadedImage.ColorShowing == 0 :
+			Pixels = RenderImagePix()
+		else :
+			ColorList = (MainWindow.ColorsNormalList, MainWindow.ColorsHighlightedList, MainWindow.ColorsSelectedList)[LoadedImage.ColorShowing - 1]
+			Colors = tuple(Color[0] for Color in ColorList)
+			Pixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
+		#end if
 		spuhelper.cairo_to_gtk(Pixels)
 		Offscreen = gtk.gdk.pixbuf_new_from_data \
 		  (
 			data = Pixels.tostring(),
-			colorspace = gtk.gdk.COLORSPACE_RGB, # hope this matches the Cairo layout
+			colorspace = gtk.gdk.COLORSPACE_RGB,
 			has_alpha = True,
 			bits_per_sample = 8,
-			width = ImageDrawSize[0],
-			height = ImageDrawSize[1],
-			rowstride = RowStride
+			width = LoadedImage.ImageDrawSize[0],
+			height = LoadedImage.ImageDrawSize[1],
+			rowstride = LoadedImage.RowStride
 		  )
 		MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
 	#end if
