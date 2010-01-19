@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8
 #+
 # This script aims to simplify the job of creating menus for DVD-Video
 # discs. It takes as input an SVG graphic created by Inkscape representing the
@@ -517,6 +518,19 @@ def EditColor(TreeView, ColorPath, ViewColumn) :
 	ChooseNewColor.destroy()
 #end EditColor
 
+def AboutMe(TheWindow) :
+	# displays a dialog showing information about the program.
+	About = gtk.AboutDialog()
+	About.set_name("DVD Menu Animator")
+	About.set_version("0.01")
+	About.set_comments("A utility to ease the construction of DVD-Video menus")
+	About.set_copyright("© 2010 Lawrence D'Oliveiro")
+	# About.set_license("GPLv3+")
+	# About.set_authors(("Lawrence D'Oliveiro",))
+	About.run()
+	About.destroy()
+#end AboutMe
+
 #+
 # Mainline
 #-
@@ -536,6 +550,8 @@ def SetupMainWindow() :
 	NewMenuItem(FileMenu, "Open...", MenuAccelGroup, "O", SelectLoadImage)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
+	HelpMenu = NewMenu(MainMenuBar, "Help")
+	NewMenuItem(HelpMenu, "About DVD Menu Animator...", None, None, AboutMe)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
 	MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
