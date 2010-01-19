@@ -157,13 +157,12 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 	#end __init__
 
 	def on_get_size(self, DrawWhere, CellRect) :
-		sys.stderr.write("ColorCellRenderer %s, %s get_size = %s\n" % (repr(self), repr(DrawWhere), repr(CellRect))) # debug
 		return (0, 0, 160, 20)
 	#end on_get_size
 
 	@staticmethod
 	def on_celldata(Column, Cell, Model, Iter, UserData) :
-		Cell.color = Model.get_value(Iter, 0)
+		Cell.color = tuple(i * 257 for i in Model.get_value(Iter, 0))
 	#end on_celldata
 
 	def on_render(self, DrawWhere, DrawOwner, BackgroundRect, CellRect, ExposeRect, Flags) :
@@ -275,7 +274,6 @@ def AnalyzeImage() :
 	"""hides the button layer and determines what colours are present in the rest
 	of the image. Uses the ImageMagick "identify" program."""
 	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
-	sys.stderr.write("selected layer id = %s\n" % repr(SelectedLayerID)) # debug
 	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
 		LayerID = Layer.get("id")
 		if LayerID in LoadedImage.Layers :
@@ -292,10 +290,13 @@ def AnalyzeImage() :
 		#end if
 	#end for
 	IndexedImage, Colors = spuhelper.index_image(RenderImagePix()[0])
-	sys.stderr.write("index_image result = %s, %s\n" % (IndexedImage, Colors)) # debug
+	MainWindow.ColorsNormalList.clear()
+	for Color in Colors :
+		MainWindow.ColorsNormalList.append((Color[0],))
+	#end for
 	# more TBD
-	if MainWindow.ColorsNormalList.iter_n_children(None) > 4 :
-		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % MainWindow.ColorsNormalList.iter_n_children(None)
+	if IndexedImage == None :
+		Msg = "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>" % len(Colors)
 	else :
 		Msg = ""
 	#end if
@@ -343,7 +344,6 @@ def LoadImage(FileName) :
 		else :
 			raise Failure("Image dimensions cannot be approximated as either 4:3 or 16:9")
 		#end if
-		sys.stderr.write("image dimensions = %s, widescreen = %s\n" % (repr(NewSrcDimensions), ("F", "T")[Widescreen])) # debug
 		for Layer in NewContents.findall("{%s}g" % ns.svg) :
 			if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
 				LayerID = Layer.get("id")
