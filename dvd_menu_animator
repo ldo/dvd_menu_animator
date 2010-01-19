@@ -486,10 +486,36 @@ def ColorDisplayChanged(TheButton, Index) :
 	sys.stderr.write("button %d active %d\n" % (Index, TheButton.get_active())) # debug
 	if not MainWindow.Loading and TheButton.get_active() :
 		LoadedImage.ColorShowing = Index
-		AnalyzeImage()
 		DisplayImage()
 	#end if
 #end ColorDisplayChanged
+
+def EditColor(TreeView, ColorPath, ViewColumn) :
+	sys.stderr.write("edit colour %s\n" % repr(ColorPath)) # debug
+	ColorList = TreeView.get_model()
+	TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
+	ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
+	Chooser = ChooseNewColor.get_color_selection()
+	Chooser.set_has_opacity_control(True)
+	Chooser.set_current_color \
+	  (
+		gtk.gdk.Color(*(i * 257 for i in TheColor[:3]))
+	  )
+	Chooser.set_current_alpha(TheColor[3] * 257)
+	Response = ChooseNewColor.run()
+	if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
+		NewColor = Chooser.get_current_color()
+		sys.stderr.write("new colour = %s\n" % (repr((NewColor.red >> 8, NewColor.green >> 8, NewColor.blue >> 8, Chooser.get_current_alpha() >> 8)),)) # debug
+		ColorList.set_value \
+		  (
+			ColorList.get_iter(ColorPath),
+			0,
+			(NewColor.red >> 8, NewColor.green >> 8, NewColor.blue >> 8, Chooser.get_current_alpha() >> 8)
+		  )
+		DisplayImage()
+	#end if
+	ChooseNewColor.destroy()
+#end EditColor
 
 #+
 # Mainline
@@ -593,6 +619,17 @@ def SetupMainWindow() :
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
+	for \
+		ColorList \
+	in \
+		(
+			MainWindow.ColorsNormalDisplay,
+			MainWindow.ColorsHighlightedDisplay,
+			MainWindow.ColorsSelectedDisplay,
+		) \
+	:
+		ColorList.connect("row-activated", EditColor)
+	#end for
 	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
 	MainWindow.Window.add(MainBox)
 	MainWindow.Window.show_all()
