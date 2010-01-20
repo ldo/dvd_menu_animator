@@ -17,7 +17,6 @@ typedef struct
   {
 	unsigned long count;
 	uint32_t pixel;
-	unsigned short index;
   } histentry;
 
 static void sort_hist_by_count
@@ -120,18 +119,20 @@ static PyObject * spuhelper_index_image
 	PyObject * Result = 0;
 	PyObject * ArrayModule = 0;
 	PyObject * SrcArray = 0;
-	unsigned long pixaddr, nrpixbytes, nrpixels, pixlen;
+	unsigned long pixaddr, nrpixbytes, srcrowstride, nrpixels, pixlen;
 	const uint32_t * pixels;
 	unsigned long nrhistentries = 0, maxhistentries, histindex;
 	histentry * histogram = 0;
 	PyObject * ResultArray = 0;
 	PyObject * HistTuple = 0;
+	uint8_t * PrevRow = 0;
+	uint8_t * CurRow = 0;
 	do /*once*/
 	  {
 		ArrayModule = PyImport_ImportModule("array");
 		if (ArrayModule == 0)
 			break;
-		if (!PyArg_ParseTuple(args, "O", &SrcArray))
+		if (!PyArg_ParseTuple(args, "Ok", &SrcArray, &srcrowstride))
 			break;
 		Py_INCREF(SrcArray);
 		GetBufferInfo(SrcArray, &pixaddr, &nrpixbytes);
@@ -219,73 +220,42 @@ static PyObject * spuhelper_index_image
 					count_factor
 		  )
 		  {
-			  {
-				if (nrhistentries > 0)
-				  {
-					histogram[0].index = 0;
-					if (nrhistentries > 1)
-					  {
-						histogram[1].index = 1;
-						if (nrhistentries > 2)
-						  {
-							histogram[2].index = 2;
-							if (nrhistentries > 3)
-							  {
-								histogram[3].index = 3;
-							  } /*if*/
-						  } /*if*/
-					  } /*if*/
-				  } /*if*/
-				for (histindex = 4; histindex < nrhistentries; ++histindex)
-				  {
-				  /* coalesce remaining colours to nearest ones among the first four */
-					unsigned long foundindex, bestindex, bestweight;
-					for (foundindex = 0; foundindex < 4; ++foundindex)
-					  {
-						const uint32_t
-							thispixel = histogram[histindex].pixel,
-							thatpixel = histogram[foundindex].pixel;
-						const long
-							delta_a = (long)(thispixel >> 24 & 255) - (long)(thatpixel >> 24 & 255),
-							delta_r = (long)(thispixel >> 16 & 255) - (long)(thatpixel >> 16 & 255),
-							delta_g = (long)(thispixel >> 8 & 255) - (long)(thatpixel >> 8 & 255),
-							delta_b = (long)(thispixel & 255) - (long)(thatpixel & 255);
-						const long weight =
-								delta_a * delta_a
-							+
-								delta_r * delta_r
-							+
-								delta_g * delta_g
-							+
-								delta_b * delta_b;
-						if (foundindex == 0 || weight < bestweight)
-						  {
-							bestindex = foundindex;
-							bestweight = weight;
-						  } /*if*/
-					  } /*for*/
-					histogram[histindex].index = bestindex;
-				  } /*for*/
-			  }
+		  /* preponderance of no more than four colours in image, rest can be put down
+			to anti-aliasing that I have to undo */
 			  {
 			  /* generate indexed version of image */
-				const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
-				const size_t MaxPixels = PixBufSize * 4; /* 2 bits per pixel */
-				uint8_t PixBuf[PixBufSize];
+				const size_t dstrowstride = (srcrowstride / 4 + 3) / 4;
+				const size_t MaxPixels = srcrowstride / 4;
 				size_t BufPixels;
+				bool FirstRow = true;
+				const unsigned long maxpixsearch = nrhistentries > 4 ? 4 : nrhistentries;
 				ResultArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
 				if (ResultArray == 0)
 					break;
+				PrevRow = malloc(dstrowstride);
+				  /* need to keep previous row of converted pixels for neighbour comparison */
+				if (PrevRow == 0)
+				  {
+					PyErr_NoMemory();
+					break;
+				  } /*if*/
+				CurRow = malloc(dstrowstride);
+				if (CurRow == 0)
+				  {
+					PyErr_NoMemory();
+					break;
+				  } /*if*/
 				pixels = (const uint32_t *)pixaddr;
 				pixlen = nrpixels;
 				BufPixels = 0;
 				for (;;)
 				  {
-				  /* extend ResultArray by a bunch of converted pixels at a time */
+				  /* extend ResultArray by a row of converted pixels at a time */
 					if (pixlen == 0 || BufPixels == MaxPixels)
 					  {
 						PyObject * BufString = 0;
 						PyObject * Result = 0;
+						uint8_t * SwapTemp;
 						do /*once*/
 						  {
 							if (BufPixels == 0)
@@ -293,9 +263,9 @@ static PyObject * spuhelper_index_image
 							if (BufPixels % 4 != 0)
 							  {
 							  /* fill out unused part of byte with zeroes--actually shouldn't occur */
-								PixBuf[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
+								CurRow[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
 							  } /*if*/
-							BufString = PyString_FromStringAndSize((const char *)PixBuf, (BufPixels + 3) / 4);
+							BufString = PyString_FromStringAndSize((const char *)CurRow, dstrowstride);
 							if (BufString == 0)
 								break;
 							Result = PyObject_CallMethod(ResultArray, "fromstring", "O", BufString);
@@ -309,17 +279,77 @@ static PyObject * spuhelper_index_image
 							break;
 						if (pixlen == 0)
 							break;
+						SwapTemp = PrevRow;
+						PrevRow = CurRow;
+						CurRow = SwapTemp;
 						BufPixels = 0;
+						FirstRow = false;
 					  } /*if*/
 					const uint32_t thispixel = *pixels;
-					for (histindex = 0; histogram[histindex].pixel != thispixel; ++histindex)
-					  /* guaranteed to find pixel index */;
 					if (BufPixels % 4 == 0)
 					  {
 					  /* starting new byte */
-						PixBuf[BufPixels / 4] = 0; /* ensure there's no junk in it */
+						CurRow[BufPixels / 4] = 0; /* ensure there's no junk in it */
 					  } /*if*/
-					PixBuf[BufPixels / 4] |= histogram[histindex].index << BufPixels % 4 * 2;
+					for (histindex = 0;;)
+					  {
+						if (histindex == maxpixsearch)
+							break;
+						if (histogram[histindex].pixel == thispixel)
+							break;
+						++histindex;
+					  } /*for*/
+					if (histindex == 4)
+					  {
+					  /* not one of the most popular colours, replace with the most popular
+						of its neighbours. Remember I only need to do this for a minority
+						of pixels, based on count_factor. */
+						unsigned long bestweight = 0; /* all weights are guaranteed greater than this */
+					  /* look only at neighbours I've already processed, otherwise this
+						will need at least two passes */
+						if (BufPixels > 0 && !FirstRow)
+						  {
+						  /* there is an upper-left neighbour */
+							const unsigned int upperleft_neighbour =
+										PrevRow[BufPixels - (BufPixels % 4 == 0 ? 1 : 0)]
+									>>
+										(BufPixels % 4 == 0 ? 6 : (BufPixels % 4 - 1) * 2)
+								&
+									3;
+							if (histogram[upperleft_neighbour].count > bestweight)
+							  {
+								histindex = upperleft_neighbour;
+								bestweight = histogram[upperleft_neighbour].count;
+							  } /*if*/
+						  } /*if*/
+						if (!FirstRow)
+						  {
+						  /* there is an upper neighbour */
+							const unsigned int upper_neighbour =
+								PrevRow[BufPixels] >> BufPixels * 2 & 3;
+							if (histogram[upper_neighbour].count > bestweight)
+							  {
+								histindex = upper_neighbour;
+								bestweight = histogram[upper_neighbour].count;
+							  } /*if*/
+						  } /*if*/
+						if (BufPixels > 0)
+						  {
+						  /* there is a left neighbour */
+							const unsigned int left_neighbour =
+										CurRow[BufPixels - (BufPixels % 4 == 0 ? 1 : 0)]
+									>>
+										(BufPixels % 4 == 0 ? 6 : (BufPixels % 4 - 1) * 2)
+								&
+									3;
+							if (histogram[left_neighbour].count > bestweight)
+							  {
+								histindex = left_neighbour;
+								bestweight = histogram[left_neighbour].count;
+							  } /*if*/
+						  } /*if*/
+					  } /*if*/
+					CurRow[BufPixels / 4] |= histindex << BufPixels % 4 * 2;
 					++BufPixels;
 					++pixels;
 					--pixlen;
@@ -381,6 +411,8 @@ static PyObject * spuhelper_index_image
 		Result = Py_BuildValue("OO", ResultArray, HistTuple);
 	  }
 	while (false);
+	free(PrevRow);
+	free(CurRow);
 	Py_XDECREF(HistTuple);
 	Py_XDECREF(ResultArray);
 	free(histogram);
@@ -592,7 +624,7 @@ static PyObject * spuhelper_cairo_to_gtk
 static PyMethodDef spuhelper_methods[] =
   {
 	{"index_image", spuhelper_index_image, METH_VARARGS,
-		"index_image(array)\n"
+		"index_image(array, row_stride)\n"
 		"analyzes a buffer of RGBA-format pixels in Cairo (native-endian) ordering, and"
 		" returns a tuple of 2 elements, the first being a new array object containing"
 		" 2 bits per pixel, and the second being a tuple of corresponding colours."
