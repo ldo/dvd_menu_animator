@@ -347,6 +347,12 @@ static PyObject * spuhelper_index_image
 								histindex = left_neighbour;
 								bestweight = histogram[left_neighbour].count;
 							  } /*if*/
+							if (bestweight == 0)
+							  {
+							  /* very first pixel has no neighbours matching above
+								criteria. What to do if this is antialiased? Fudge it. */
+								histindex = 0;
+							  } /*if*/
 						  } /*if*/
 					  } /*if*/
 					CurRow[BufPixels / 4] |= histindex << BufPixels % 4 * 2;
