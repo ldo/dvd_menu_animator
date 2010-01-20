@@ -268,9 +268,13 @@ def RenderImagePix() :
 def AnalyzeImage() :
 	"""hides the button layer and determines what colours are present in the rest
 	of the image."""
-	LoadedImage.ImageDrawSize = ((720, 540), (960, 540))[LoadedImage.Widescreen]
+	LoadedImage.ImageDrawSize = ((480, 360), (640, 360))[LoadedImage.Widescreen]
 	if hasattr(cairo, "format_stride_for_width") :
-		LoadedImage.RowStride = cairo.format_stride_for_width(cairo.FORMAT_ARGB32, LoadedImage.ImageDrawSize[0])
+		LoadedImage.RowStride = cairo.format_stride_for_width \
+		  (
+			cairo.FORMAT_ARGB32,
+			LoadedImage.ImageDrawSize[0]
+		  )
 	else :
 		LoadedImage.RowStride = LoadedImage.ImageDrawSize[0] * 4
 	#end if
@@ -393,13 +397,13 @@ def LoadImage(FileName) :
 		LoadedImage.Contents = NewContents
 		LoadedImage.SrcDimensions = NewSrcDimensions
 		LoadedImage.Widescreen = Widescreen
-		# MainWindow.ImageDisplay.set_size_request(*(((720, 540), (960, 540))[Widescreen]))
-		  # how can I keep it user-resizable?
 		MainWindow.LayerList.clear()
 		for Layer in NewLayerList :
 			MainWindow.LayerList.append(Layer)
 		#end for
 		LoadedImage.Layers = NewLayers
+		MainWindow.LayerDisplay.get_selection().select_path((len(MainWindow.LayerList) - 1,))
+		  # default to using top layer as buttons
 		LoadedImage.ColorShowing = 0
 		for Index, Button in enumerate(MainWindow.ColorButtonGroup.get_group()) :
 			Button.set_active(Button == MainWindow.ColorButtonGroup)
@@ -407,7 +411,6 @@ def LoadImage(FileName) :
 		#end for
 		MainWindow.Loading = False
 		AnalyzeImage()
-		# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 		DisplayImage()
 	except Failure, Reason :
 		ErrorAlert(Reason.Msg)
@@ -479,7 +482,6 @@ def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
 	FindButtons()
 	AnalyzeImage()
-	# MainWindow.ImageDisplay.queue_draw() # why doesn't this work?
 	DisplayImage()
 #end LayerSelectionChanged
 
