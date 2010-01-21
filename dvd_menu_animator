@@ -163,15 +163,28 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 
 	@staticmethod
 	def on_celldata(Column, Cell, Model, Iter, UserData) :
-		Cell.color = tuple(i * 257 for i in Model.get_value(Iter, 0))
+		Cell.color = tuple(i / 255 for i in Model.get_value(Iter, 0))
 	#end on_celldata
 
 	def on_render(self, DrawWhere, DrawOwner, BackgroundRect, CellRect, ExposeRect, Flags) :
 		Draw = gtk.gdk.GC(DrawWhere)
 		ColorMap = Draw.get_colormap()
 		Draw.set_function(gtk.gdk.COPY)
-		Fade = 0xffff - self.color[3]
-		Draw.set_foreground(ColorMap.alloc_color(gtk.gdk.Color(self.color[0] + Fade, self.color[1] + Fade, self.color[2] + Fade)))
+		Opacity = self.color[3]
+		Draw.set_foreground \
+		  (
+			ColorMap.alloc_color
+			  (
+				gtk.gdk.Color
+				  (
+					*tuple
+					  (
+						int(round(((c - 0.5) * Opacity + 0.5) * 65535))
+						for c in self.color[:3]
+					  )
+				  )
+			  )
+		  )
 		DrawWhere.draw_rectangle(Draw, True, CellRect.x, CellRect.y, CellRect.width, CellRect.height)
 		if Flags == gtk.CELL_RENDERER_SELECTED :
 			Draw.set_function(gtk.gdk.INVERT)
