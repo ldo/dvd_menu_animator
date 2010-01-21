@@ -330,16 +330,69 @@ def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image."""
 	if LoadedImage.Contents != None :
 		if LoadedImage.ColorShowing == 0 :
-			Pixels = RenderImagePix()
+			ImagePixels = RenderImagePix()
 		else :
-			ColorList = (MainWindow.ColorsNormalList, MainWindow.ColorsHighlightedList, MainWindow.ColorsSelectedList)[LoadedImage.ColorShowing - 1]
+			ColorList = \
+				(MainWindow.ColorsNormalList, MainWindow.ColorsHighlightedList, MainWindow.ColorsSelectedList)[LoadedImage.ColorShowing - 1]
 			Colors = tuple(Color[0] for Color in ColorList)
-			Pixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
+			ImagePixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
 		#end if
-		spuhelper.cairo_to_gtk(Pixels)
+		Light = 0xFFD6D6D6 # same colours that gtk.ColorSelection uses for background of opacity display
+		Dark = 0xFFACACAC
+		PatternArray = array.array \
+		  (
+			"I",
+				16 * (16 * (Light,) + 16 * (Dark,))
+			+
+				16 * (16 * (Dark,) + 16 * (Light,))
+		  )
+		CheckPattern = cairo.SurfacePattern \
+		  (
+			cairo.ImageSurface.create_for_data
+			  (
+				PatternArray, # data
+				cairo.FORMAT_ARGB32, # format
+				32, # width
+				32, # height
+				32 * 4 # stride
+			  )
+		  ) # to show through less-than-fully-opaque pixels
+		CheckPattern.set_extend(cairo.EXTEND_REPEAT)
+		DisplayPixels = array.array \
+		  (
+			"B",
+			(255, 255, 255, 255) * LoadedImage.ImageDrawSize[1] * (LoadedImage.RowStride // 4)
+		  )
+		CompositeSurface = cairo.ImageSurface.create_for_data \
+		  (
+			DisplayPixels, # data
+			cairo.FORMAT_ARGB32, # format
+			LoadedImage.ImageDrawSize[0], # width
+			LoadedImage.ImageDrawSize[1], # height
+			LoadedImage.RowStride # stride
+		  )
+		Composite = cairo.Context(CompositeSurface)
+		Composite.set_source(CheckPattern)
+		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
+		Composite.fill()
+		Composite.set_source_surface \
+		  (
+			cairo.ImageSurface.create_for_data
+			  (
+				ImagePixels, # data
+				cairo.FORMAT_ARGB32, # format
+				LoadedImage.ImageDrawSize[0], # width
+				LoadedImage.ImageDrawSize[1], # height
+				LoadedImage.RowStride # stride
+			  )
+		  )
+		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
+		Composite.fill()
+		CompositeSurface.flush()
+		spuhelper.cairo_to_gtk(DisplayPixels)
 		Offscreen = gtk.gdk.pixbuf_new_from_data \
 		  (
-			data = Pixels.tostring(),
+			data = DisplayPixels.tostring(),
 			colorspace = gtk.gdk.COLORSPACE_RGB,
 			has_alpha = True,
 			bits_per_sample = 8,
