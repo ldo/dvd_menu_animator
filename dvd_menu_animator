@@ -570,21 +570,29 @@ def EditColor(TreeView, ColorPath, ViewColumn) :
 	ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
 	Chooser = ChooseNewColor.get_color_selection()
 	Chooser.set_has_opacity_control(True)
-	Chooser.set_current_color \
-	  (
-		gtk.gdk.Color(*(i * 257 for i in TheColor[:3]))
-	  )
-	Chooser.set_current_alpha(TheColor[3] * 257)
+	if TheColor[3] != 0 : # convert from premultiplied alpha
+		Chooser.set_current_color \
+		  (
+			gtk.gdk.Color(*(i * 65535 // TheColor[3] for i in TheColor[:3]))
+		  )
+		Chooser.set_current_alpha(TheColor[3] * 257)
+	else :
+		Chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
+		Chooser.set_current_alpha(0)
+	#end if
 	Response = ChooseNewColor.run()
 	if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
 		NewColor = Chooser.get_current_color()
-		sys.stderr.write("new colour = %s\n" % (repr((NewColor.red >> 8, NewColor.green >> 8, NewColor.blue >> 8, Chooser.get_current_alpha() >> 8)),)) # debug
-		ColorList.set_value \
-		  (
-			ColorList.get_iter(ColorPath),
-			0,
-			(NewColor.red >> 8, NewColor.green >> 8, NewColor.blue >> 8, Chooser.get_current_alpha() >> 8)
-		  )
+		Opacity = Chooser.get_current_alpha() >> 8
+		NewColor = \
+			( # convert to premultiplied alpha
+				NewColor.red // 257 * Opacity // 255,
+				NewColor.green // 257 * Opacity // 255,
+				NewColor.blue // 257 * Opacity // 255,
+				Opacity,
+			)
+		sys.stderr.write("new colour = %s\n" % repr(NewColor)) # debug
+		ColorList.set_value(ColorList.get_iter(ColorPath), 0, NewColor)
 		DisplayImage()
 	#end if
 	ChooseNewColor.destroy()
