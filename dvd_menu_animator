@@ -307,11 +307,7 @@ def AnalyzeImage() :
 			  )
 		#end if
 	#end for
-	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image \
-	  (
-		RenderImagePix(),
-		LoadedImage.RowStride
-	  )
+	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix())
 	for \
 		ColorList \
 	in \

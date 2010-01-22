@@ -13,10 +13,59 @@
 	Miscellaneous useful stuff
 */
 
+static void extract_hsv
+  (
+	uint32_t pixel, /* cairo ARGB format */
+	unsigned int * h,
+	unsigned int * s,
+	unsigned int * v
+  )
+  /* converts the RGB colour of the pixel to H, S and V components. */
+  {
+	const unsigned int
+		r = pixel >> 16 & 255,
+		g = pixel >> 8 & 255,
+		b = pixel & 255;
+	int v0, v1, v2, hoffset;
+	if (r >= g && r >= b)
+	  {
+		v0 = r;
+		v1 = g;
+		v2 = b;
+		hoffset = 65536 / 6;
+	  }
+	else if (g >= r && g >= b)
+	  {
+		v0 = g;
+		v1 = b;
+		v2 = r;
+		hoffset = 65536 / 2;
+	  }
+	else /* b >= r && b >= g */
+	  {
+		v0 = b;
+		v1 = r;
+		v2 = g;
+		hoffset = 65536 * 5 / 6;
+	  } /*if*/
+	if (v0 != 0)
+	  {
+		*h = (hoffset + 65536 + (v1 - v2) * 65536 / 6 / v0) % 65536;
+		*s = (v0 - (v1 < v2 ? v1 : v2)) * 65536 / v0;
+	  }
+	else /* v1, v2 also 0 */
+	  {
+		*h = 0;
+		*v = 0;
+	  } /*if*/
+	*v = v0 * 257;
+  } /*extract_hsv*/
+
 typedef struct
   {
 	unsigned long count;
 	uint32_t pixel;
+	unsigned short index;
   } histentry;
 
 static void sort_hist_by_count
@@ -119,20 +168,18 @@ static PyObject * spuhelper_index_image
 	PyObject * Result = 0;
 	PyObject * ArrayModule = 0;
 	PyObject * SrcArray = 0;
-	unsigned long pixaddr, nrpixbytes, srcrowstride, nrpixels, pixlen;
+	unsigned long pixaddr, nrpixbytes, nrpixels, pixlen;
 	const uint32_t * pixels;
 	unsigned long nrhistentries = 0, maxhistentries, histindex;
 	histentry * histogram = 0;
 	PyObject * ResultArray = 0;
 	PyObject * HistTuple = 0;
-	uint8_t * PrevRow = 0;
-	uint8_t * CurRow = 0;
 	do /*once*/
 	  {
 		ArrayModule = PyImport_ImportModule("array");
 		if (ArrayModule == 0)
 			break;
-		if (!PyArg_ParseTuple(args, "Ok", &SrcArray, &srcrowstride))
+		if (!PyArg_ParseTuple(args, "O", &SrcArray))
 			break;
 		Py_INCREF(SrcArray);
 		GetBufferInfo(SrcArray, &pixaddr, &nrpixbytes);
@@ -223,39 +270,77 @@ static PyObject * spuhelper_index_image
 		  /* preponderance of no more than four colours in image, rest can be put down
 			to anti-aliasing that I have to undo */
 			  {
+				if (nrhistentries > 0)
+				  {
+					histogram[0].index = 0;
+					if (nrhistentries > 1)
+					  {
+						histogram[1].index = 1;
+						if (nrhistentries > 2)
+						  {
+							histogram[2].index = 2;
+							if (nrhistentries > 3)
+							  {
+								histogram[3].index = 3;
+							  } /*if*/
+						  } /*if*/
+					  } /*if*/
+				  } /*if*/
+				for (histindex = 4; histindex < nrhistentries; ++histindex)
+				  {
+				  /* coalesce remaining colours to nearest ones among the first four */
+					unsigned long foundindex, bestindex, bestweight;
+					bestweight = 0;
+					for (foundindex = 0; foundindex < 4; ++foundindex)
+					  {
+						unsigned int h1, s1, v1, h2, s2, v2;
+						extract_hsv(histogram[histindex].pixel, &h1, &s1, &v1);
+						extract_hsv(histogram[foundindex].pixel, &h2, &s2, &v2);
+						const long
+							delta_a =
+									(int)(histogram[histindex].pixel >> 24 & 255)
+								-
+									(int)(histogram[foundindex].pixel >> 24 & 255),
+							delta_h = (int)h1 - (int)h2,
+							delta_s = (int)s1 - (int)s2,
+							delta_v = (int)v1 - (int)v2;
+						const unsigned long weight =
+								delta_a * delta_a
+							+
+								4 * delta_h * delta_h
+								  /* stricter hue matching to reduce colour fringing effects */
+							+
+								delta_s * delta_s
+							+
+								delta_v * delta_v;
+						if (foundindex == 0 || weight < bestweight)
+						  {
+							bestindex = foundindex;
+							bestweight = weight;
+						  } /*if*/
+					  } /*for*/
+					histogram[histindex].index = bestindex;
+				  } /*for*/
+			  }
+			  {
 			  /* generate indexed version of image */
-				const size_t dstrowstride = (srcrowstride / 4 + 3) / 4;
-				const size_t MaxPixels = srcrowstride / 4;
+				const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
+				const size_t MaxPixels = PixBufSize * 4; /* 2 bits per pixel */
+				uint8_t PixBuf[PixBufSize];
 				size_t BufPixels;
-				bool FirstRow = true;
-				const unsigned long maxpixsearch = nrhistentries > 4 ? 4 : nrhistentries;
 				ResultArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
 				if (ResultArray == 0)
 					break;
-				PrevRow = malloc(dstrowstride);
-				  /* need to keep previous row of converted pixels for neighbour comparison */
-				if (PrevRow == 0)
-				  {
-					PyErr_NoMemory();
-					break;
-				  } /*if*/
-				CurRow = malloc(dstrowstride);
-				if (CurRow == 0)
-				  {
-					PyErr_NoMemory();
-					break;
-				  } /*if*/
 				pixels = (const uint32_t *)pixaddr;
 				pixlen = nrpixels;
 				BufPixels = 0;
 				for (;;)
 				  {
-				  /* extend ResultArray by a row of converted pixels at a time */
+				  /* extend ResultArray by a bunch of converted pixels at a time */
 					if (pixlen == 0 || BufPixels == MaxPixels)
 					  {
 						PyObject * BufString = 0;
 						PyObject * Result = 0;
-						uint8_t * SwapTemp;
 						do /*once*/
 						  {
 							if (BufPixels == 0)
@@ -263,9 +348,9 @@ static PyObject * spuhelper_index_image
 							if (BufPixels % 4 != 0)
 							  {
 							  /* fill out unused part of byte with zeroes--actually shouldn't occur */
-								CurRow[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
+								PixBuf[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
 							  } /*if*/
-							BufString = PyString_FromStringAndSize((const char *)CurRow, dstrowstride);
+							BufString = PyString_FromStringAndSize((const char *)PixBuf, (BufPixels + 3) / 4);
 							if (BufString == 0)
 								break;
 							Result = PyObject_CallMethod(ResultArray, "fromstring", "O", BufString);
@@ -279,83 +364,17 @@ static PyObject * spuhelper_index_image
 							break;
 						if (pixlen == 0)
 							break;
-						SwapTemp = PrevRow;
-						PrevRow = CurRow;
-						CurRow = SwapTemp;
 						BufPixels = 0;
-						FirstRow = false;
 					  } /*if*/
 					const uint32_t thispixel = *pixels;
+					for (histindex = 0; histogram[histindex].pixel != thispixel; ++histindex)
+					  /* guaranteed to find pixel index */;
 					if (BufPixels % 4 == 0)
 					  {
 					  /* starting new byte */
-						CurRow[BufPixels / 4] = 0; /* ensure there's no junk in it */
+						PixBuf[BufPixels / 4] = 0; /* ensure there's no junk in it */
 					  } /*if*/
-					for (histindex = 0;;)
-					  {
-						if (histindex == maxpixsearch)
-							break;
-						if (histogram[histindex].pixel == thispixel)
-							break;
-						++histindex;
-					  } /*for*/
-					if (histindex == 4)
-					  {
-					  /* not one of the most popular colours, replace with the most popular
-						of its neighbours. Remember I only need to do this for a minority
-						of pixels, based on count_factor. */
-						unsigned long bestweight = 0; /* all weights are guaranteed greater than this */
-					  /* look only at neighbours I've already processed, otherwise this
-						will need at least two passes */
-						if (BufPixels > 0 && !FirstRow)
-						  {
-						  /* there is an upper-left neighbour */
-							const unsigned int upperleft_neighbour =
-										PrevRow[BufPixels - (BufPixels % 4 == 0 ? 1 : 0)]
-									>>
-										(BufPixels % 4 == 0 ? 6 : (BufPixels % 4 - 1) * 2)
-								&
-									3;
-							if (histogram[upperleft_neighbour].count > bestweight)
-							  {
-								histindex = upperleft_neighbour;
-								bestweight = histogram[upperleft_neighbour].count;
-							  } /*if*/
-						  } /*if*/
-						if (!FirstRow)
-						  {
-						  /* there is an upper neighbour */
-							const unsigned int upper_neighbour =
-								PrevRow[BufPixels] >> BufPixels * 2 & 3;
-							if (histogram[upper_neighbour].count > bestweight)
-							  {
-								histindex = upper_neighbour;
-								bestweight = histogram[upper_neighbour].count;
-							  } /*if*/
-						  } /*if*/
-						if (BufPixels > 0)
-						  {
-						  /* there is a left neighbour */
-							const unsigned int left_neighbour =
-										CurRow[BufPixels - (BufPixels % 4 == 0 ? 1 : 0)]
-									>>
-										(BufPixels % 4 == 0 ? 6 : (BufPixels % 4 - 1) * 2)
-								&
-									3;
-							if (histogram[left_neighbour].count > bestweight)
-							  {
-								histindex = left_neighbour;
-								bestweight = histogram[left_neighbour].count;
-							  } /*if*/
-							if (bestweight == 0)
-							  {
-							  /* very first pixel has no neighbours matching above
-								criteria. What to do if this is antialiased? Fudge it. */
-								histindex = 0;
-							  } /*if*/
-						  } /*if*/
-					  } /*if*/
-					CurRow[BufPixels / 4] |= histindex << BufPixels % 4 * 2;
+					PixBuf[BufPixels / 4] |= histogram[histindex].index << BufPixels % 4 * 2;
 					++BufPixels;
 					++pixels;
 					--pixlen;
@@ -417,8 +436,6 @@ static PyObject * spuhelper_index_image
 		Result = Py_BuildValue("OO", ResultArray, HistTuple);
 	  }
 	while (false);
-	free(PrevRow);
-	free(CurRow);
 	Py_XDECREF(HistTuple);
 	Py_XDECREF(ResultArray);
 	free(histogram);
@@ -630,7 +647,7 @@ static PyObject * spuhelper_cairo_to_gtk
 static PyMethodDef spuhelper_methods[] =
   {
 	{"index_image", spuhelper_index_image, METH_VARARGS,
-		"index_image(array, row_stride)\n"
+		"index_image(array)\n"
 		"analyzes a buffer of RGBA-format pixels in Cairo (native-endian) ordering, and"
 		" returns a tuple of 2 elements, the first being a new array object containing"
 		" 2 bits per pixel, and the second being a tuple of corresponding colours."
