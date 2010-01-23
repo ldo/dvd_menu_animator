@@ -110,7 +110,7 @@ def DefineScrollingList \
 	column of ListModel, with the specified heading."""
 	ListDisplay = gtk.TreeView(ListModel)
 	Column = gtk.TreeViewColumn(Heading)
-	Column.set_alignment(0.5)
+	Column.set_alignment(0)
 	ListDisplay.append_column(Column)
 	if Renderer == None :
 		Renderer = gtk.CellRendererText()
@@ -448,7 +448,6 @@ def LoadImage(FileName) :
 		for Layer in NewContents.findall("{%s}g" % ns.svg) :
 			if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
 				LayerID = Layer.get("id")
-				sys.stderr.write("found layer ID = %s\n" % repr(LayerID)) # debug
 				NewLayers[LayerID] = \
 					{
 						"visible" : Layer.get("style") != "display:none",
@@ -564,7 +563,6 @@ def LayerSelectionChanged(TheSelection) :
 #end LayerSelectionChanged
 
 def ColorDisplayChanged(TheButton, Index) :
-	sys.stderr.write("button %d active %d\n" % (Index, TheButton.get_active())) # debug
 	if not MainWindow.Loading and TheButton.get_active() :
 		LoadedImage.ColorShowing = Index
 		DisplayImage()
@@ -572,38 +570,38 @@ def ColorDisplayChanged(TheButton, Index) :
 #end ColorDisplayChanged
 
 def EditColor(TreeView, ColorPath, ViewColumn) :
-	sys.stderr.write("edit colour %s\n" % repr(ColorPath)) # debug
-	ColorList = TreeView.get_model()
-	TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
-	ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
-	Chooser = ChooseNewColor.get_color_selection()
-	Chooser.set_has_opacity_control(True)
-	if TheColor[3] != 0 : # convert from premultiplied alpha
-		Chooser.set_current_color \
-		  (
-			gtk.gdk.Color(*(i * 65535 // TheColor[3] for i in TheColor[:3]))
-		  )
-		Chooser.set_current_alpha(TheColor[3] * 257)
-	else :
-		Chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
-		Chooser.set_current_alpha(0)
+	if ColorPath[0] < 4 : # excess colours won't be saved anyway
+		ColorList = TreeView.get_model()
+		TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
+		ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
+		Chooser = ChooseNewColor.get_color_selection()
+		Chooser.set_has_opacity_control(True)
+		if TheColor[3] != 0 : # convert from premultiplied alpha
+			Chooser.set_current_color \
+			  (
+				gtk.gdk.Color(*(i * 65535 // TheColor[3] for i in TheColor[:3]))
+			  )
+			Chooser.set_current_alpha(TheColor[3] * 257)
+		else :
+			Chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
+			Chooser.set_current_alpha(0)
+		#end if
+		Response = ChooseNewColor.run()
+		if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
+			NewColor = Chooser.get_current_color()
+			Opacity = Chooser.get_current_alpha() >> 8
+			NewColor = \
+				( # convert to premultiplied alpha
+					NewColor.red // 257 * Opacity // 255,
+					NewColor.green // 257 * Opacity // 255,
+					NewColor.blue // 257 * Opacity // 255,
+					Opacity,
+				)
+			ColorList.set_value(ColorList.get_iter(ColorPath), 0, NewColor)
+			DisplayImage()
+		#end if
+		ChooseNewColor.destroy()
 	#end if
-	Response = ChooseNewColor.run()
-	if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
-		NewColor = Chooser.get_current_color()
-		Opacity = Chooser.get_current_alpha() >> 8
-		NewColor = \
-			( # convert to premultiplied alpha
-				NewColor.red // 257 * Opacity // 255,
-				NewColor.green // 257 * Opacity // 255,
-				NewColor.blue // 257 * Opacity // 255,
-				Opacity,
-			)
-		sys.stderr.write("new colour = %s\n" % repr(NewColor)) # debug
-		ColorList.set_value(ColorList.get_iter(ColorPath), 0, NewColor)
-		DisplayImage()
-	#end if
-	ChooseNewColor.destroy()
 #end EditColor
 
 def AboutMe(TheWindow) :
@@ -629,8 +627,10 @@ def SetupMainWindow() :
 	MainWindow.Window = gtk.Window()
 	MainWindow.Window.connect("destroy", DestroyWindow)
 	CommonBoxMargin = 8
-	MainBox = gtk.VBox(False, CommonBoxMargin)
-	MainMenuBar = BoxPack(gtk.MenuBar(), MainBox)
+	MainPlusMenuBox = gtk.VBox(False, 0)
+	MainMenuBar = BoxPack(gtk.MenuBar(), MainPlusMenuBox)
+	MainBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MainPlusMenuBox)
+	MainBox.set_border_width(CommonBoxMargin)
 	MenuAccelGroup = gtk.AccelGroup()
 	MainWindow.Window.add_accel_group(MenuAccelGroup)
 	FileMenu = NewMenu(MainMenuBar, "File")
@@ -641,6 +641,7 @@ def SetupMainWindow() :
 	HelpMenu = NewMenu(MainMenuBar, "Help")
 	NewMenuItem(HelpMenu, "About DVD Menu Animator...", None, None, AboutMe)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
+	MiddleBox.set_border_width(CommonBoxMargin)
 	MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
 	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
@@ -668,7 +669,8 @@ def SetupMainWindow() :
 	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
-	CommonListBounds = (160, 160)
+	NameListBounds = (160, 160)
+	ColorListBounds = (120, 120)
 	MainWindow.LayerDisplay = DefineScrollingList \
 	  (
 		ListModel = MainWindow.LayerList,
@@ -676,7 +678,7 @@ def SetupMainWindow() :
 		Renderer = None,
 		ColAttribute = "text",
 		Heading = "Button Layer",
-		Bounds = CommonListBounds,
+		Bounds = NameListBounds,
 		OnSelectionChanged = LayerSelectionChanged,
 		AddToBox = List1Box
 	  )
@@ -687,7 +689,7 @@ def SetupMainWindow() :
 		Renderer = None,
 		ColAttribute = "text",
 		Heading = "Buttons",
-		Bounds = CommonListBounds,
+		Bounds = NameListBounds,
 		OnSelectionChanged = None, # ButtonSelectionChanged TBD
 		AddToBox = List1Box
 	  )
@@ -698,7 +700,7 @@ def SetupMainWindow() :
 		Renderer = ColorCellRenderer(),
 		ColAttribute = None, # can't just simply add my own properties without registering them for an object class
 		Heading = "Normal",
-		Bounds = CommonListBounds,
+		Bounds = ColorListBounds,
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
@@ -709,7 +711,7 @@ def SetupMainWindow() :
 		Renderer = ColorCellRenderer(),
 		ColAttribute = None,
 		Heading = "Highlight",
-		Bounds = CommonListBounds,
+		Bounds = ColorListBounds,
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
@@ -720,7 +722,7 @@ def SetupMainWindow() :
 		Renderer = ColorCellRenderer(),
 		ColAttribute = None,
 		Heading = "Select",
-		Bounds = CommonListBounds,
+		Bounds = ColorListBounds,
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
@@ -736,7 +738,7 @@ def SetupMainWindow() :
 		ColorList.connect("row-activated", EditColor)
 	#end for
 	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
-	MainWindow.Window.add(MainBox)
+	MainWindow.Window.add(MainPlusMenuBox)
 	MainWindow.Window.show_all()
 #end SetupMainWindow
 
