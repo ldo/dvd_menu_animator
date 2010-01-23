@@ -308,6 +308,26 @@ def AnalyzeImage() :
 		#end if
 	#end for
 	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix())
+	LoadedImage.ColorShowing = 0
+	if LoadedImage.IndexedImage == None :
+		Msg = \
+			(
+				"<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
+			%
+				len(LoadedImage.Colors)
+			)
+		UseColors = ()
+	else :
+		Msg = ""
+		MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
+		for Button in MainWindow.ColorButtonGroup.get_group() :
+			Index = Button.get_data("index")
+			Button.set_active(Index == 0)
+			Button.set_flags(gtk.SENSITIVE)
+		#end for
+		MainWindow.Loading = False
+	#end if
+	UseColors = LoadedImage.Colors
 	for \
 		ColorList \
 	in \
@@ -318,20 +338,11 @@ def AnalyzeImage() :
 		) \
 	:
 		ColorList.clear()
-		for Color in LoadedImage.Colors :
+		for Color in UseColors :
 			ColorList.append((Color[0],))
 		#end for
+		UseColors = UseColors[:4] # no more than 4 for highlighted & selected lists
 	#end for
-	if LoadedImage.IndexedImage == None :
-		Msg = \
-			(
-				"<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
-			%
-				len(LoadedImage.Colors)
-			)
-	else :
-		Msg = ""
-	#end if
 	MainWindow.StatusMsg.set_markup(Msg)
 #end AnalyzeImage
 
@@ -369,7 +380,7 @@ def DisplayImage() :
 		CheckPattern.set_extend(cairo.EXTEND_REPEAT)
 		DisplayPixels = array.array \
 		  (
-			"B",
+			"B", # not "I" because then tostring puts the bytes in the wrong order
 			(255, 255, 255, 255) * LoadedImage.ImageDrawSize[1] * (LoadedImage.RowStride // 4)
 		  )
 		CompositeSurface = cairo.ImageSurface.create_for_data \
@@ -471,9 +482,10 @@ def LoadImage(FileName) :
 		MainWindow.LayerDisplay.get_selection().select_path((len(MainWindow.LayerList) - 1,))
 		  # default to using top layer as buttons
 		LoadedImage.ColorShowing = 0
-		for Index, Button in enumerate(MainWindow.ColorButtonGroup.get_group()) :
-			Button.set_active(Button == MainWindow.ColorButtonGroup)
-			Button.set_flags(gtk.SENSITIVE)
+		for Button in MainWindow.ColorButtonGroup.get_group() :
+			Index = Button.get_data("index")
+			Button.set_active(Index == 0)
+			(Button.unset_flags, Button.set_flags)[Index == 0](gtk.SENSITIVE)
 		#end for
 		MainWindow.Loading = False
 		AnalyzeImage()
@@ -640,6 +652,7 @@ def SetupMainWindow() :
 	BoxPack(gtk.Label("Using Colours:"), RadioBox)
 	for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected")) :
 		Button = BoxPack(gtk.RadioButton(MainWindow.ColorButtonGroup, Label), RadioBox)
+		Button.set_data("index", Index)
 		Button.set_active(MainWindow.ColorButtonGroup == None)
 		if MainWindow.ColorButtonGroup == None :
 			MainWindow.ColorButtonGroup = Button
