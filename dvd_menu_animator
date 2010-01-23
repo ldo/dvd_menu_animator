@@ -40,16 +40,21 @@ class Failure(Exception) :
 
 #end Failure
 
-#+
-# Namespaces
-#-
-
 class ns :
-	"""XML namespaces."""
+	"""XML namespaces used in SVG files."""
 	svg = "http://www.w3.org/2000/svg"
 	sodipodi = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
 	inkscape = "http://www.inkscape.org/namespaces/inkscape"
 #end ns
+
+class keyval :
+	"""are there official symbolic names for these anywhere?"""
+	returnkey = 0xff0d
+	enterkey = 0xff8d
+#end keyval
+
+select_delay = 0.25
+  # how long to display a button in the selected state
 
 #+
 # Useful GUI stuff
@@ -218,6 +223,25 @@ def ErrorAlert(Msg) :
 	TheDialog.destroy()
 #end ErrorAlert
 
+def ForgetButtonBlink() :
+	if MainWindow.ButtonBlinkTask != None :
+		glib.source_remove(MainWindow.ButtonBlinkTask)
+		MainWindow.ButtonBlinkTask = None
+	#end if
+	MainWindow.ButtonSelected = False
+#end ForgetButtonBlink
+
+def BlinkHighlightedButton() :
+	ForgetButtonBlink()
+	MainWindow.ButtonBlinkTask = glib.timeout_add \
+	  (
+		int(round(select_delay * 1000)),
+		ButtonSelectionDone
+	  )
+	MainWindow.ButtonSelected = True
+	DisplayImage()
+#end BlinkHighlightedButton
+
 #+
 # Global Data
 #-
@@ -349,16 +373,37 @@ def AnalyzeImage() :
 def DisplayImage() :
 	"""(re)displays the currently-loaded SVG image."""
 	if LoadedImage.Contents != None :
+		HighlightPixels = None # to begin with
 		if LoadedImage.ColorShowing == 0 :
 			ImagePixels = RenderImagePix()
 		else :
 			ColorList = \
-				(MainWindow.ColorsNormalList, MainWindow.ColorsHighlightedList, MainWindow.ColorsSelectedList)[LoadedImage.ColorShowing - 1]
+				(
+					MainWindow.ColorsNormalList,
+					MainWindow.ColorsHighlightedList,
+					MainWindow.ColorsSelectedList,
+					MainWindow.ColorsNormalList
+				)[LoadedImage.ColorShowing - 1]
 			Colors = tuple(Color[0] for Color in ColorList)
 			ImagePixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
+			if MainWindow.ButtonHighlightRect != None and LoadedImage.ColorShowing == 4 :
+				HighlightPixels = spuhelper.expand_image \
+				  (
+					LoadedImage.IndexedImage,
+					tuple
+					  (
+						Color[0]
+						for Color in
+							(
+								MainWindow.ColorsHighlightedList,
+								MainWindow.ColorsSelectedList
+							)[MainWindow.ButtonSelected]
+					  )
+				  )
+			#end if
 		#end if
-		Light = 0xFFD6D6D6 # same colours that gtk.ColorSelection uses for background of opacity display
-		Dark = 0xFFACACAC
+		Light, Dark = 0xFFD6D6D6, 0xFFACACAC
+		  # same colours that gtk.ColorSelection uses for background of opacity display
 		PatternArray = array.array \
 		  (
 			"I",
@@ -408,6 +453,21 @@ def DisplayImage() :
 		  )
 		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
 		Composite.fill()
+		if HighlightPixels != None :
+			Composite.set_source_surface \
+			  (
+				cairo.ImageSurface.create_for_data
+				  (
+					HighlightPixels, # data
+					cairo.FORMAT_ARGB32, # format
+					LoadedImage.ImageDrawSize[0], # width
+					LoadedImage.ImageDrawSize[1], # height
+					LoadedImage.RowStride # stride
+				  )
+			  )
+			Composite.rectangle(*MainWindow.ButtonHighlightRect)
+			Composite.fill()
+		#end if
 		CompositeSurface.flush()
 		spuhelper.cairo_to_gtk(DisplayPixels)
 		Offscreen = gtk.gdk.pixbuf_new_from_data \
@@ -487,6 +547,7 @@ def LoadImage(FileName) :
 			(Button.unset_flags, Button.set_flags)[Index == 0](gtk.SENSITIVE)
 		#end for
 		MainWindow.Loading = False
+		ForgetButtonBlink()
 		AnalyzeImage()
 		DisplayImage()
 	except Failure, Reason :
@@ -557,6 +618,7 @@ def SelectLoadImage(TheWindow) :
 
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
+	ForgetButtonBlink()
 	FindButtons()
 	AnalyzeImage()
 	DisplayImage()
@@ -565,11 +627,14 @@ def LayerSelectionChanged(TheSelection) :
 def ColorDisplayChanged(TheButton, Index) :
 	if not MainWindow.Loading and TheButton.get_active() :
 		LoadedImage.ColorShowing = Index
+		ForgetButtonBlink()
 		DisplayImage()
 	#end if
 #end ColorDisplayChanged
 
 def EditColor(TreeView, ColorPath, ViewColumn) :
+	# called when an item in a colour list is double-clicked.
+	ForgetButtonBlink()
 	if ColorPath[0] < 4 : # excess colours won't be saved anyway
 		ColorList = TreeView.get_model()
 		TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
@@ -603,6 +668,89 @@ def EditColor(TreeView, ColorPath, ViewColumn) :
 		ChooseNewColor.destroy()
 	#end if
 #end EditColor
+
+def ButtonSelectionDone() :
+	# timeout callback to turn off display of button in selected state
+	MainWindow.ButtonBlinkTask = None
+	MainWindow.ButtonSelected = False
+	DisplayImage()
+	return False # one-off invocation
+#end ButtonSelectionDone
+
+def ImageClickEvent(TheWidget, TheEvent) :
+	sys.stderr.write("ImageClickEvent type %d\n" % TheEvent.type) # debug
+	Handled = False
+	if LoadedImage.ColorShowing == 4 :
+		if TheEvent.type == gtk.gdk.BUTTON_PRESS :
+			MainWindow.ImageClick.grab_focus()
+		elif TheEvent.type == gtk.gdk.BUTTON_RELEASE :
+			pass
+			# Handled = True
+		elif TheEvent.type == gtk.gdk.FOCUS_CHANGE :
+			if not TheEvent.in_ :
+				ForgetButtonBlink()
+				if MainWindow.ButtonHighlightRect != None :
+					MainWindow.ButtonHighlightRect = None
+					DisplayImage()
+				#end if
+			#end if
+			# Handled = True
+		elif TheEvent.type == gtk.gdk.KEY_PRESS :
+			sys.stderr.write \
+			  (
+				"key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+			  ) # debug
+			if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
+				BlinkHighlightedButton()
+			#end if
+			# TBD up, down, left, right?
+			Handled = True
+		#end if
+		if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
+			FindButton = iter(MainWindow.ButtonList)
+			while True :
+				try :
+					ThisButton = FindButton.next()
+				except StopIteration :
+					ThisButton = None
+					break
+				#end try
+				ThisButton = ThisButton[1]
+				ThisButton = \
+					(
+						ThisButton[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+						ThisButton[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+						ThisButton[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+						ThisButton[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+					)
+				if (
+						TheEvent.x >= ThisButton[0]
+					and
+						TheEvent.x < ThisButton[0] + ThisButton[2]
+					and
+						TheEvent.y >= ThisButton[1]
+					and
+						TheEvent.y < ThisButton[1] + ThisButton[3]
+				) :
+					break
+				#end if
+			#end while
+			if ThisButton != MainWindow.ButtonHighlightRect :
+				ForgetButtonBlink()
+				MainWindow.ButtonHighlightRect = ThisButton
+				DisplayImage()
+			#end if
+			# Handled = True
+		#end if
+		if TheEvent.type == gtk.gdk.BUTTON_PRESS :
+			if MainWindow.ButtonHighlightRect != None :
+				BlinkHighlightedButton()
+			#end if
+			# Handled = True
+		#end if
+	#end if
+	return Handled
+#end ImageClickEvent
 
 def AboutMe(TheWindow) :
 	# displays a dialog showing information about the program.
@@ -642,7 +790,26 @@ def SetupMainWindow() :
 	NewMenuItem(HelpMenu, "About DVD Menu Animator...", None, None, AboutMe)
 	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
 	MiddleBox.set_border_width(CommonBoxMargin)
-	MainWindow.ImageDisplay = BoxPack(gtk.Image(), MiddleBox)
+	MainWindow.ImageClick = BoxPack(gtk.EventBox(), MiddleBox)
+	MainWindow.ImageDisplay = gtk.Image()
+	MainWindow.ImageClick.add(MainWindow.ImageDisplay)
+	MainWindow.ImageClick.set_visible_window(False)
+	MainWindow.ImageClick.set_above_child(True)
+	MainWindow.ImageClick.set_flags(gtk.CAN_FOCUS)
+	for \
+		Signal \
+	in \
+		(
+			"button-press-event",
+			"button-release-event",
+			"focus-in-event",
+			"focus-out-event",
+			"key-press-event",
+			"motion-notify-event",
+		) \
+	:
+		MainWindow.ImageClick.connect(Signal, ImageClickEvent)
+	#end for
 	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
 	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
 	RadioBox = BoxPack(gtk.VBox(False, CommonBoxMargin), List1Box)
@@ -651,7 +818,7 @@ def SetupMainWindow() :
 	MainWindow.Loading = True
 	LoadedImage.ColorShowing = 0
 	BoxPack(gtk.Label("Using Colours:"), RadioBox)
-	for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected")) :
+	for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected", "Live")) :
 		Button = BoxPack(gtk.RadioButton(MainWindow.ColorButtonGroup, Label), RadioBox)
 		Button.set_data("index", Index)
 		Button.set_active(MainWindow.ColorButtonGroup == None)
@@ -666,6 +833,10 @@ def SetupMainWindow() :
 	  # first col is display name, second is layer ID
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
 	  # first col is button id/name, second is bounds tuple
+	MainWindow.ButtonHighlightRect = None
+	  # area to draw in highlighted colours
+	MainWindow.ButtonSelected = False
+	MainWindow.ButtonBlinkTask = None
 	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
