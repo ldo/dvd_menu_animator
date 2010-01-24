@@ -150,6 +150,57 @@ static void GetBufferInfo
 	Py_XDECREF(TheBufferInfo);
   } /*GetBufferInfo*/
 
+static long GetIntProperty
+  (
+	PyObject * FromGObject,
+	const char * PropertyName
+  )
+  /* gets an integer-valued property from a gobject.GObject. */
+  {
+	long result = 0; /* arbitrary to begin with */
+	PyObject * PropValue = 0;
+	do /*once*/
+	  {
+		PropValue = PyObject_CallMethod(FromGObject, "get_property", "s", PropertyName);
+		if (PropValue == 0)
+			break;
+		result = PyInt_AsLong(PropValue);
+	  }
+	while (false);
+	Py_XDECREF(PropValue);
+	return result;
+  } /*GetIntProperty*/
+
+static bool GetBoolProperty
+  (
+	PyObject * FromGObject,
+	const char * PropertyName
+  )
+  /* gets a boolean-valued property from a gobject.GObject. */
+  {
+	bool result = false; /* arbitrary to begin with */
+	PyObject * PropValue = 0;
+	do /*once*/
+	  {
+		PropValue = PyObject_CallMethod(FromGObject, "get_property", "s", PropertyName);
+		if (PropValue == 0)
+			break;
+		if (!PyBool_Check(PropValue))
+		  {
+			PyErr_SetString
+			  (
+				PyExc_TypeError,
+				"a boolean is required"
+			  );
+			break;
+		  } /*if*/
+		result = PyObject_Compare(PropValue, Py_False) != 0;
+	  }
+	while (false);
+	Py_XDECREF(PropValue);
+	return result;
+  } /*GetBoolProperty*/
+
 /*
 	User-visible stuff
 */
@@ -603,14 +654,142 @@ static PyObject * spuhelper_expand_image
 	return Result;
   } /*spuhelper_expand_image*/
 
+static PyObject * spuhelper_gtk_to_cairo_a
+  (
+	PyObject * self,
+	PyObject * args
+  )
+  /* converts the pixels in an RGB-format pixbuf to Cairo (native-endian) ordering, adding
+	a fully-opaque alpha channel, and returns the result in a new array object. */
+  {
+	PyObject * result = 0;
+	PyObject * ArrayModule = 0;
+	PyObject * SrcPixBuf = 0;
+	PyObject * SrcPixString = 0;
+	PyObject * SrcPixArray = 0;
+	PyObject * DstArray = 0;
+	unsigned long PixBase, PixLen, ImageWidth, ImageHeight, RowStride;
+	unsigned int NrChannels;
+	bool HasAlpha;
+	do /*once*/
+	  {
+		ArrayModule = PyImport_ImportModule("array");
+		if (ArrayModule == 0)
+			break;
+		if (!PyArg_ParseTuple(args, "O", &SrcPixBuf))
+			break;
+		Py_INCREF(SrcPixBuf);
+		SrcPixString = PyObject_CallMethod(SrcPixBuf, "get_pixels", "");
+		  /* have to make a copy of the pixels, can't get their original address ... sigh */
+		if (SrcPixString == 0)
+			break;
+		SrcPixArray = PyObject_CallMethod(ArrayModule, "array", "sO", "B", SrcPixString);
+		  /* and yet another copy of the pixels, into an array object that I can directly address ... sigh */
+		if (SrcPixArray == 0)
+			break;
+		Py_DECREF(SrcPixString);
+		SrcPixString = 0; /* try to free up some memory */
+		GetBufferInfo(SrcPixArray, &PixBase, &PixLen);
+		if (PyErr_Occurred())
+			break;
+		ImageWidth = GetIntProperty(SrcPixBuf, "width");
+		ImageHeight = GetIntProperty(SrcPixBuf, "height");
+		RowStride = GetIntProperty(SrcPixBuf, "rowstride");
+		HasAlpha = GetBoolProperty(SrcPixBuf, "has-alpha");
+		NrChannels = GetIntProperty(SrcPixBuf, "n-channels");
+		if (PyErr_Occurred())
+			break;
+		if (!(HasAlpha ? NrChannels == 4 : NrChannels == 3))
+		  {
+			PyErr_SetString
+			  (
+				PyExc_ValueError,
+				"image must have 3 components, excluding alpha"
+			  );
+			break;
+		  } /*if*/
+		  {
+			const size_t MaxPixels = 128 /* convenient buffer size to avoid heap allocation */;
+			uint32_t PixBuf[MaxPixels];
+			size_t NrBufPixels, CurRow, ColsLeft;
+			const uint8_t * SrcPixels;
+			unsigned int A, R, G, B;
+			DstArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
+			if (DstArray == 0)
+				break;
+			CurRow = 0;
+			ColsLeft = 0;
+			NrBufPixels = 0;
+			for (;;)
+			  {
+			  /* extend DstArray by a bunch of converted pixels at a time */
+				if (ColsLeft == 0 && CurRow < ImageHeight)
+				  {
+					SrcPixels = (const uint8_t *)(PixBase + CurRow * RowStride);
+					++CurRow;
+					ColsLeft = ImageWidth;
+				  } /*if*/
+				if (ColsLeft == 0 || NrBufPixels == MaxPixels)
+				  {
+					PyObject * BufString = 0;
+					PyObject * Result = 0;
+					do /*once*/
+					  {
+						if (NrBufPixels == 0)
+							break; /* nothing to flush out */
+						BufString = PyString_FromStringAndSize((const char *)PixBuf, NrBufPixels * 4);
+						if (BufString == 0)
+							break;
+						Result = PyObject_CallMethod(DstArray, "fromstring", "O", BufString);
+						if (Result == 0)
+							break;
+					  }
+					while (false);
+					Py_XDECREF(Result);
+					Py_XDECREF(BufString);
+					if (PyErr_Occurred())
+						break;
+					if (ColsLeft == 0)
+						break;
+					NrBufPixels = 0;
+				  } /*if*/
+				R = *SrcPixels++;
+				G = *SrcPixels++;
+				B = *SrcPixels++;
+				A = HasAlpha ? *SrcPixels++ : 255;
+				PixBuf[NrBufPixels++] =
+						A << 24
+					|
+						R << 16
+					|
+						G << 8
+					|
+						B;
+				--ColsLeft;
+			  } /*for*/
+			if (PyErr_Occurred())
+				break;
+		  }
+	  /* all done */
+		result = DstArray;
+		DstArray = 0; /* so I don't dispose of it yet */
+	  }
+	while (false);
+	Py_XDECREF(DstArray);
+	Py_XDECREF(SrcPixArray);
+	Py_XDECREF(SrcPixString);
+	Py_XDECREF(SrcPixBuf);
+	Py_XDECREF(ArrayModule);
+	return result;
+  } /*spuhelper_gtk_to_cairo_a*/  
+
 static PyObject * spuhelper_cairo_to_gtk
   (
 	PyObject * self,
 	PyObject * args
   )
   /* converts a buffer of RGBA-format pixels from Cairo (native-endian) ordering to
-	GTK Pixbuf (big-endian) ordering. I guess this function isn't directly related
-	to the other two, but where else to put it? */
+	GTK Pixbuf (big-endian) ordering. */
   {
 	PyObject * result = 0;
 	PyObject * TheArray = 0;
@@ -658,6 +837,12 @@ static PyMethodDef spuhelper_methods[] =
 		"expands a 2-bit-per-pixel image as previously generated by index_image,"
 		" substituting the specified colours. Returns an array object containing"
 		" 32 bits per pixel in Cairo (native-endian) ordering."
+	},
+	{"gtk_to_cairo_a", spuhelper_gtk_to_cairo_a, METH_VARARGS,
+		"gtk_to_cairo_a(pixbuf)\n"
+			"converts the pixels in an RGB-format pixbuf to Cairo (native-endian)"
+			" ordering, adding a fully-opaque alpha channel, and returns the result"
+			" in a new array object."
 	},
 	{"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS,
 		"cairo_to_gtk(array)\n"

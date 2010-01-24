@@ -56,6 +56,15 @@ class keyval :
 select_delay = 0.25
   # how long to display a button in the selected state
 
+def RectMatrix(SrcRect, DstRect) :
+	"""returns a Cairo matrix that maps the corners of SrcRect to DstRect."""
+	Result = cairo.Matrix()
+	Result.translate(- SrcRect[0], - SrcRect[1])
+	Result.scale(DstRect[2] / SrcRect[2], DstRect[3] / SrcRect[3])
+	Result.translate(DstRect[0], DstRect[1])
+	return Result
+#end RectMatrix
+
 #+
 # Useful GUI stuff
 #-
@@ -440,6 +449,20 @@ def DisplayImage() :
 		Composite.set_source(CheckPattern)
 		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
 		Composite.fill()
+		if LoadedImage.Background != None :
+			BackgroundPattern = cairo.SurfacePattern(LoadedImage.Background)
+			BackgroundPattern.set_matrix \
+			  (
+				RectMatrix
+				  (
+					(0, 0) + LoadedImage.ImageDrawSize,
+					(0, 0, LoadedImage.Background.get_width(), LoadedImage.Background.get_height())
+				  )
+			  )
+			Composite.set_source(BackgroundPattern)
+			Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
+			Composite.fill()
+		#end if
 		Composite.set_source_surface \
 		  (
 			cairo.ImageSurface.create_for_data
@@ -484,7 +507,7 @@ def DisplayImage() :
 	#end if
 #end DisplayImage
 
-def LoadImage(FileName) :
+def LoadMenuImage(FileName) :
 	"""loads a new SVG image file and also collects various useful information about it."""
 	try :
 		try :
@@ -553,7 +576,31 @@ def LoadImage(FileName) :
 	except Failure, Reason :
 		ErrorAlert(Reason.Msg)
 	#end try
-#end LoadImage
+#end LoadMenuImage
+
+def LoadBackgroundImage(FileName) :
+	"""loads a new background image."""
+	try :
+		try :
+			ImagePixBuf = gtk.gdk.pixbuf_new_from_file(FileName)
+		except glib.GError, Why :
+			raise Failure(str(Why))
+		#end try
+		ImagePixArray = spuhelper.gtk_to_cairo_a(ImagePixBuf)
+		LoadedImage.Background = cairo.ImageSurface.create_for_data \
+		  (
+			ImagePixArray, # data
+			cairo.FORMAT_ARGB32, # format
+			ImagePixBuf.get_property("width"), # width
+			ImagePixBuf.get_property("height"), # height
+			ImagePixBuf.get_property("width") * 4 # stride
+		  )
+		ForgetButtonBlink()
+		DisplayImage()
+	except Failure, Reason :
+		ErrorAlert(Reason.Msg)
+	#end try
+#end LoadBackgroundImage
 
 def FindButtons() :
 	"""finds all button definitions in the selected button layer."""
@@ -592,8 +639,8 @@ def DestroyWindow(TheWindow) :
 	gtk.main_quit()
 #end DestroyWindow
 
-def SelectLoadImage(TheWindow) :
-	# lets the user choose an SVG file to load.
+def SelectLoadMenuImage(TheWindow) :
+	# lets the user choose an SVG file to load for the menu image.
 	TheDialog = gtk.FileChooserDialog \
 	  (
 		title = "Choose SVG Image for Menu",
@@ -612,9 +659,37 @@ def SelectLoadImage(TheWindow) :
 	#end if
 	TheDialog.destroy()
 	if ImageFileName != None :
-		LoadImage(ImageFileName)
+		LoadMenuImage(ImageFileName)
 	#end if
-#end SelectLoadImage
+#end SelectLoadMenuImage
+
+def SelectLoadBackgroundImage(TheWindow) :
+	# lets the user choose a JPEG or PNG file to load for the background image.
+	TheDialog = gtk.FileChooserDialog \
+	  (
+		title = "Choose JPEG or PNG Image for Background",
+		action = gtk.FILE_CHOOSER_ACTION_OPEN,
+		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+	  )
+	for Name, Pats in (("JPEG Files", ("*.jpg", "*.jpeg")), ("PNG Files", ("*.png",))) :
+		TheFilter = gtk.FileFilter()
+		TheFilter.set_name(Name)
+		for Pat in Pats :
+			TheFilter.add_pattern(Pat)
+		#end for
+		TheDialog.add_filter(TheFilter)
+	#end for
+	Response = TheDialog.run()
+	if Response == gtk.RESPONSE_OK :
+		ImageFileName = TheDialog.get_filename()
+	else :
+		ImageFileName = None
+	#end if
+	TheDialog.destroy()
+	if ImageFileName != None :
+		LoadBackgroundImage(ImageFileName)
+	#end if
+#end SelectLoadBackgroundImage
 
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
@@ -783,7 +858,8 @@ def SetupMainWindow() :
 	MainWindow.Window.add_accel_group(MenuAccelGroup)
 	FileMenu = NewMenu(MainMenuBar, "File")
 	# FileMenu.set_accel_path("<main>/File") # doesn't seem to work
-	NewMenuItem(FileMenu, "Open...", MenuAccelGroup, "O", SelectLoadImage)
+	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
+	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
 	HelpMenu = NewMenu(MainMenuBar, "Help")
@@ -915,5 +991,6 @@ def SetupMainWindow() :
 
 SetupMainWindow()
 LoadedImage.Contents = None # to begin with
+LoadedImage.Background = None # ditto
 MainWindow.Window.show()
 gtk.main()
