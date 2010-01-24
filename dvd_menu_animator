@@ -295,10 +295,8 @@ def RenderImagePix() :
 	  )
 	Offscreen = cairo.Context(OffscreenPix)
 	Offscreen.identity_matrix()
-	Offscreen.reset_clip()
-	Offscreen.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
 	Offscreen.set_source_rgba(1, 1, 1, 1)
-	Offscreen.fill()
+	Offscreen.paint()
 	ScaleFactor = min \
 	  (
 		LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
@@ -447,8 +445,7 @@ def DisplayImage() :
 		  )
 		Composite = cairo.Context(CompositeSurface)
 		Composite.set_source(CheckPattern)
-		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
-		Composite.fill()
+		Composite.paint()
 		if LoadedImage.Background != None :
 			BackgroundPattern = cairo.SurfacePattern(LoadedImage.Background)
 			BackgroundPattern.set_matrix \
@@ -460,8 +457,7 @@ def DisplayImage() :
 				  )
 			  )
 			Composite.set_source(BackgroundPattern)
-			Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
-			Composite.fill()
+			Composite.paint()
 		#end if
 		Composite.set_source_surface \
 		  (
@@ -474,8 +470,7 @@ def DisplayImage() :
 				LoadedImage.RowStride # stride
 			  )
 		  )
-		Composite.rectangle(*((0, 0) + LoadedImage.ImageDrawSize))
-		Composite.fill()
+		Composite.paint()
 		if HighlightPixels != None :
 			Composite.set_source_surface \
 			  (
