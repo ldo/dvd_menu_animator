@@ -757,12 +757,14 @@ def DragGetColor(ColorList, DragContext, SelectionData, InfoID, TimeStamp) :
 
 def DragSetColor(ColorList, DragContext, DropX, DropY, SelectionData, InfoID, TimeStamp) :
 	# called on a drag to save the colour spec into the drag destination.
+	DropY -= ColorList.get_cell_area((0,), ColorList.get_column(0)).height
+	  # FUDGE: GTK bug? seems to pass Y-coordinate from top of column heading,
+	  # not from top of first cell
 	TheColor = SelectionData.get_text()
 	ThePath = ColorList.get_path_at_pos(DropX, DropY)
 	if ThePath != None and TheColor != "" :
 		ThePath = ThePath[0]
-		ThePath = (ThePath[0] - 1,) # FUDGE: GTK bug? returns one greater--is it including column header when computing cell y-offset?
-		if ThePath[0] >= 0 and ThePath[0] < 4 :
+		if ThePath[0] < 4 :
 			ColorList.get_model().set_value \
 			  (
 				ColorList.get_model().get_iter(ThePath),
