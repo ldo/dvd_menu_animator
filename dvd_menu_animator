@@ -660,29 +660,34 @@ def SelectLoadMenuImage(TheWindow) :
 
 def SelectLoadBackgroundImage(TheWindow) :
 	# lets the user choose a JPEG or PNG file to load for the background image.
-	TheDialog = gtk.FileChooserDialog \
-	  (
-		title = "Choose JPEG or PNG Image for Background",
-		action = gtk.FILE_CHOOSER_ACTION_OPEN,
-		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
-	  )
-	for Name, Pats in (("JPEG Files", ("*.jpg", "*.jpeg")), ("PNG Files", ("*.png",))) :
-		TheFilter = gtk.FileFilter()
-		TheFilter.set_name(Name)
-		for Pat in Pats :
-			TheFilter.add_pattern(Pat)
-		#end for
-		TheDialog.add_filter(TheFilter)
-	#end for
-	Response = TheDialog.run()
-	if Response == gtk.RESPONSE_OK :
-		ImageFileName = TheDialog.get_filename()
+	if LoadedImage.Contents == None :
+		ErrorAlert("Load the menu image first.")
+		  # because I'm not currently showing the background otherwise
 	else :
-		ImageFileName = None
-	#end if
-	TheDialog.destroy()
-	if ImageFileName != None :
-		LoadBackgroundImage(ImageFileName)
+		TheDialog = gtk.FileChooserDialog \
+		  (
+			title = "Choose JPEG or PNG Image for Background",
+			action = gtk.FILE_CHOOSER_ACTION_OPEN,
+			buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+		  )
+		for Name, Pats in (("JPEG Files", ("*.jpg", "*.jpeg")), ("PNG Files", ("*.png",))) :
+			TheFilter = gtk.FileFilter()
+			TheFilter.set_name(Name)
+			for Pat in Pats :
+				TheFilter.add_pattern(Pat)
+			#end for
+			TheDialog.add_filter(TheFilter)
+		#end for
+		Response = TheDialog.run()
+		if Response == gtk.RESPONSE_OK :
+			ImageFileName = TheDialog.get_filename()
+		else :
+			ImageFileName = None
+		#end if
+		TheDialog.destroy()
+		if ImageFileName != None :
+			LoadBackgroundImage(ImageFileName)
+		#end if
 	#end if
 #end SelectLoadBackgroundImage
 
@@ -738,6 +743,36 @@ def EditColor(TreeView, ColorPath, ViewColumn) :
 		ChooseNewColor.destroy()
 	#end if
 #end EditColor
+
+def DragGetColor(ColorList, DragContext, SelectionData, InfoID, TimeStamp) :
+	# called on a drag to retrieve the colour spec from the drag source.
+	TheColor = GetSingleListSelection(ColorList, 0)
+	if TheColor != None :
+		TheColor = ",".join(str(i) for i in TheColor[:4])
+	else :
+		TheColor = ""
+	#end if
+	SelectionData.set_text(TheColor, -1)
+#end DragGetColor
+
+def DragSetColor(ColorList, DragContext, DropX, DropY, SelectionData, InfoID, TimeStamp) :
+	# called on a drag to save the colour spec into the drag destination.
+	TheColor = SelectionData.get_text()
+	ThePath = ColorList.get_path_at_pos(DropX, DropY)
+	if ThePath != None and TheColor != "" :
+		ThePath = ThePath[0]
+		ThePath = (ThePath[0] - 1,) # FUDGE: GTK bug? returns one greater--is it including column header when computing cell y-offset?
+		if ThePath[0] >= 0 and ThePath[0] < 4 :
+			ColorList.get_model().set_value \
+			  (
+				ColorList.get_model().get_iter(ThePath),
+				0,
+				tuple(int(i) for i in TheColor.split(","))
+			  )
+			DisplayImage()
+		#end if
+	#end if
+#end DragSetColor
 
 def ButtonSelectionDone() :
 	# timeout callback to turn off display of button in selected state
@@ -851,7 +886,6 @@ def SetupMainWindow() :
 	MenuAccelGroup = gtk.AccelGroup()
 	MainWindow.Window.add_accel_group(MenuAccelGroup)
 	FileMenu = NewMenu(MainMenuBar, "File")
-	# FileMenu.set_accel_path("<main>/File") # doesn't seem to work
 	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
 	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
 	NewMenuSeparatorItem(FileMenu)
@@ -904,7 +938,7 @@ def SetupMainWindow() :
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
 	  # first col is button id/name, second is bounds tuple
 	MainWindow.ButtonHighlightRect = None
-	  # area to draw in highlighted colours
+	  # area to draw in highlighted/selected colours
 	MainWindow.ButtonSelected = False
 	MainWindow.ButtonBlinkTask = None
 	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
@@ -912,6 +946,17 @@ def SetupMainWindow() :
 	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	NameListBounds = (160, 160)
 	ColorListBounds = (120, 120)
+	MainWindow.ButtonDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.ButtonList,
+		Col = 0,
+		Renderer = None,
+		ColAttribute = "text",
+		Heading = "Buttons",
+		Bounds = NameListBounds,
+		OnSelectionChanged = None, # TBD perhaps sync list selection to live button selection
+		AddToBox = List1Box
+	  )
 	MainWindow.LayerDisplay = DefineScrollingList \
 	  (
 		ListModel = MainWindow.LayerList,
@@ -923,23 +968,13 @@ def SetupMainWindow() :
 		OnSelectionChanged = LayerSelectionChanged,
 		AddToBox = List1Box
 	  )
-	MainWindow.ButtonDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.ButtonList,
-		Col = 0,
-		Renderer = None,
-		ColAttribute = "text",
-		Heading = "Buttons",
-		Bounds = NameListBounds,
-		OnSelectionChanged = None, # ButtonSelectionChanged TBD
-		AddToBox = List1Box
-	  )
 	MainWindow.ColorsNormalDisplay = DefineScrollingList \
 	  (
 		ListModel = MainWindow.ColorsNormalList,
 		Col = 0,
 		Renderer = ColorCellRenderer(),
-		ColAttribute = None, # can't just simply add my own properties without registering them for an object class
+		ColAttribute = None,
+		  # can't just simply add my own properties without registering them for an object class
 		Heading = "Normal",
 		Bounds = ColorListBounds,
 		OnSelectionChanged = None,
@@ -977,6 +1012,20 @@ def SetupMainWindow() :
 		) \
 	:
 		ColorList.connect("row-activated", EditColor)
+		ColorList.connect("drag-data-get", DragGetColor)
+		ColorList.connect("drag-data-received", DragSetColor)
+		ColorList.drag_dest_set \
+		  (
+			flags = gtk.DEST_DEFAULT_ALL,
+			targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+			actions = gtk.gdk.ACTION_COPY
+		  )
+		ColorList.drag_source_set \
+		  (
+			start_button_mask = gtk.gdk.BUTTON1_MASK,
+			targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+			actions = gtk.gdk.ACTION_COPY
+		  )
 	#end for
 	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
 	MainWindow.Window.add(MainPlusMenuBox)
