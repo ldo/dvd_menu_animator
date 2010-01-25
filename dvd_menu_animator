@@ -748,7 +748,6 @@ def ButtonSelectionDone() :
 #end ButtonSelectionDone
 
 def ImageClickEvent(TheWidget, TheEvent) :
-	sys.stderr.write("ImageClickEvent type %d\n" % TheEvent.type) # debug
 	Handled = False
 	if LoadedImage.ColorShowing == 4 :
 		if TheEvent.type == gtk.gdk.BUTTON_PRESS :
@@ -812,7 +811,7 @@ def ImageClickEvent(TheWidget, TheEvent) :
 			#end if
 			# Handled = True
 		#end if
-		if TheEvent.type == gtk.gdk.BUTTON_PRESS :
+		if TheEvent.type == gtk.gdk._2BUTTON_PRESS :
 			if MainWindow.ButtonHighlightRect != None :
 				BlinkHighlightedButton()
 			#end if
