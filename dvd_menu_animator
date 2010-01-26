@@ -166,6 +166,7 @@ def GetSingleListSelection(ListDisplay, Col) :
 #end GetSingleListSelection
 
 class ColorCellRenderer(gtk.GenericCellRenderer) :
+	"""renders a list cell showing a colour with optional opacity."""
 
 	# def __init__(self) :
 	#     mustn't be present, or it doesn't get initialized properly
@@ -184,7 +185,11 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 		Draw = gtk.gdk.GC(DrawWhere)
 		ColorMap = Draw.get_colormap()
 		Draw.set_function(gtk.gdk.COPY)
-		Opacity = self.color[3]
+		if len(self.color) > 3 :
+			Opacity = self.color[3]
+		else :
+			Opacity = 1.0
+		#end if
 		Draw.set_foreground \
 		  (
 			ColorMap.alloc_color
@@ -199,7 +204,15 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 				  )
 			  )
 		  )
-		DrawWhere.draw_rectangle(Draw, True, CellRect.x, CellRect.y, CellRect.width, CellRect.height)
+		DrawWhere.draw_rectangle \
+		  (
+			Draw,
+			True,
+			CellRect.x,
+			CellRect.y,
+			CellRect.width,
+			CellRect.height
+		  )
 		if Flags == gtk.CELL_RENDERER_SELECTED :
 			Draw.set_function(gtk.gdk.INVERT)
 			Draw.set_line_attributes \
@@ -209,7 +222,15 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 				cap_style = gtk.gdk.CAP_BUTT,
 				join_style = gtk.gdk.JOIN_MITER
 			  )
-			DrawWhere.draw_rectangle(Draw, False, CellRect.x, CellRect.y, CellRect.width, CellRect.height)
+			DrawWhere.draw_rectangle \
+			  (
+				Draw,
+				False,
+				CellRect.x,
+				CellRect.y,
+				CellRect.width,
+				CellRect.height
+			  )
 		#end if
 	#end on_render
 
@@ -231,6 +252,33 @@ def ErrorAlert(Msg) :
 	Response = TheDialog.run()
 	TheDialog.destroy()
 #end ErrorAlert
+
+def ChooseOpenFile(Prompt, Filters) :
+	"""lets the user choose a file matching the specified filters, returning
+	its pathname on success or None if user cancelled."""
+	TheDialog = gtk.FileChooserDialog \
+	  (
+		title = Prompt,
+		action = gtk.FILE_CHOOSER_ACTION_OPEN,
+		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+	  )
+	for Name, Pats in Filters :
+		TheFilter = gtk.FileFilter()
+		TheFilter.set_name(Name)
+		for Pat in Pats :
+			TheFilter.add_pattern(Pat)
+		#end for
+		TheDialog.add_filter(TheFilter)
+	#end for
+	Response = TheDialog.run()
+	if Response == gtk.RESPONSE_OK :
+		ChosenFileName = TheDialog.get_filename()
+	else :
+		ChosenFileName = None
+	#end if
+	TheDialog.destroy()
+	return ChosenFileName
+#end ChooseOpenFile
 
 def ForgetButtonBlink() :
 	if MainWindow.ButtonBlinkTask != None :
@@ -636,23 +684,11 @@ def DestroyWindow(TheWindow) :
 
 def SelectLoadMenuImage(TheWindow) :
 	# lets the user choose an SVG file to load for the menu image.
-	TheDialog = gtk.FileChooserDialog \
+	ImageFileName = ChooseOpenFile \
 	  (
-		title = "Choose SVG Image for Menu",
-		action = gtk.FILE_CHOOSER_ACTION_OPEN,
-		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+		Prompt = "Choose SVG Image for Menu",
+		Filters = (("SVG Files", ("*.svg",)),)
 	  )
-	SVGFilter = gtk.FileFilter()
-	SVGFilter.set_name("SVG Files")
-	SVGFilter.add_pattern("*.svg")
-	TheDialog.add_filter(SVGFilter)
-	Response = TheDialog.run()
-	if Response == gtk.RESPONSE_OK :
-		ImageFileName = TheDialog.get_filename()
-	else :
-		ImageFileName = None
-	#end if
-	TheDialog.destroy()
 	if ImageFileName != None :
 		LoadMenuImage(ImageFileName)
 	#end if
@@ -664,32 +700,79 @@ def SelectLoadBackgroundImage(TheWindow) :
 		ErrorAlert("Load the menu image first.")
 		  # because I'm not currently showing the background otherwise
 	else :
-		TheDialog = gtk.FileChooserDialog \
+		ImageFileName = ChooseOpenFile \
 		  (
-			title = "Choose JPEG or PNG Image for Background",
-			action = gtk.FILE_CHOOSER_ACTION_OPEN,
-			buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+			Prompt = "Choose JPEG or PNG Image for Background",
+			Filters =
+				(
+					("JPEG Files", ("*.jpg", "*.jpeg")),
+					("PNG Files", ("*.png",)),
+				)
 		  )
-		for Name, Pats in (("JPEG Files", ("*.jpg", "*.jpeg")), ("PNG Files", ("*.png",))) :
-			TheFilter = gtk.FileFilter()
-			TheFilter.set_name(Name)
-			for Pat in Pats :
-				TheFilter.add_pattern(Pat)
-			#end for
-			TheDialog.add_filter(TheFilter)
-		#end for
-		Response = TheDialog.run()
-		if Response == gtk.RESPONSE_OK :
-			ImageFileName = TheDialog.get_filename()
-		else :
-			ImageFileName = None
-		#end if
-		TheDialog.destroy()
 		if ImageFileName != None :
 			LoadBackgroundImage(ImageFileName)
 		#end if
 	#end if
 #end SelectLoadBackgroundImage
+
+def SelectLoadColors(TheWindow) :
+	# lets the user choose a palette file of colours to choose from.
+	PaletteFileName = ChooseOpenFile \
+	  (
+		Prompt = "Choose Palette File to Load",
+		Filters = (("GIMP Palette Files", ("*.gpl",)),)
+	  )
+	if PaletteFileName != None :
+		try :
+			try :
+				PaletteFile = open(PaletteFileName, "r")
+			except IOError, Why :
+				raise Failure(str(Why))
+			#end try
+			if PaletteFile.readline().strip() != "GIMP Palette" :
+				raise Failure("doesn't look like a GIMP palette file")
+			#end if
+			Name = "Untitled"
+			while True :
+				line = PaletteFile.readline()
+				if len(line) == 0 :
+					raise Failure("palette file seems to be empty")
+				#end if
+				line = line.rstrip("\n")
+				if line.startswith("Name: ") :
+					Name = line[6:].strip()
+				#end if
+				if line.startswith("#") :
+					break
+			#end while
+			Colors = []
+			while True :
+				line = PaletteFile.readline()
+				if len(line) == 0 :
+					break
+				line = line.rstrip("\n")
+				components = line.split("\t", 1)
+				if len(components) == 1 :
+					components.append("") # empty name
+				#end if
+				try :
+					color = tuple(int(i.strip()) for i in components[0].split(None, 2))
+				except ValueError :
+					raise Failure("bad colour on line %s" % repr(line))
+				#end try
+				Colors.append((color, components[1]))
+			#end while
+		  # all successfully loaded
+			MainWindow.LoadedColorsList.clear()
+			for color in Colors :
+				MainWindow.LoadedColorsList.append((color[0],)) # TBD display name as well
+			#end for
+			MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
+		except Failure, Reason :
+			ErrorAlert(Reason.Msg)
+		#end try
+	#end if
+#end SelectLoadColors
 
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
@@ -748,7 +831,7 @@ def DragGetColor(ColorList, DragContext, SelectionData, InfoID, TimeStamp) :
 	# called on a drag to retrieve the colour spec from the drag source.
 	TheColor = GetSingleListSelection(ColorList, 0)
 	if TheColor != None :
-		TheColor = ",".join(str(i) for i in TheColor[:4])
+		TheColor = ",".join(str(i) for i in TheColor)
 	else :
 		TheColor = ""
 	#end if
@@ -765,12 +848,14 @@ def DragSetColor(ColorList, DragContext, DropX, DropY, SelectionData, InfoID, Ti
 	if ThePath != None and TheColor != "" :
 		ThePath = ThePath[0]
 		if ThePath[0] < 4 :
-			ColorList.get_model().set_value \
-			  (
-				ColorList.get_model().get_iter(ThePath),
-				0,
-				tuple(int(i) for i in TheColor.split(","))
-			  )
+			ListModel = ColorList.get_model()
+			TheRow = ListModel.get_iter(ThePath)
+			TheColor = tuple(int(i) for i in TheColor.split(","))
+			if len(TheColor) < 4 :
+				# no new opacity, preserve existing setting
+				TheColor = TheColor + (ListModel.get_value(TheRow, 0)[3],)
+			#end if
+			ListModel.set_value(TheRow, 0, TheColor)
 			DisplayImage()
 		#end if
 	#end if
@@ -809,10 +894,11 @@ def ImageClickEvent(TheWidget, TheEvent) :
 			if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
 				BlinkHighlightedButton()
 			#end if
-			# TBD up, down, left, right?
+			# TBD button navigation, left = 65361, up = 65362, right = 65363, down = 65364
 			Handled = True
 		#end if
 		if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
+			# TBD do buttons in reverse order to pick up topmost one
 			FindButton = iter(MainWindow.ButtonList)
 			while True :
 				try :
@@ -890,6 +976,7 @@ def SetupMainWindow() :
 	FileMenu = NewMenu(MainMenuBar, "File")
 	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
 	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
+	NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
 	HelpMenu = NewMenu(MainMenuBar, "Help")
@@ -946,6 +1033,7 @@ def SetupMainWindow() :
 	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+	MainWindow.LoadedColorsList = gtk.ListStore(gobject.TYPE_PYOBJECT)
 	NameListBounds = (160, 160)
 	ColorListBounds = (120, 120)
 	MainWindow.ButtonDisplay = DefineScrollingList \
@@ -1004,6 +1092,17 @@ def SetupMainWindow() :
 		OnSelectionChanged = None,
 		AddToBox = List2Box
 	  )
+	MainWindow.LoadedColorsDisplay = DefineScrollingList \
+	  (
+		ListModel = MainWindow.LoadedColorsList,
+		Col = 0,
+		Renderer = ColorCellRenderer(),
+		ColAttribute = None,
+		Heading = "",
+		Bounds = (ColorListBounds[0], ColorListBounds[1] * 2),
+		OnSelectionChanged = None,
+		AddToBox = MiddleBox
+	  )
 	for \
 		ColorList \
 	in \
@@ -1029,6 +1128,13 @@ def SetupMainWindow() :
 			actions = gtk.gdk.ACTION_COPY
 		  )
 	#end for
+	MainWindow.LoadedColorsDisplay.connect("drag-data-get", DragGetColor)
+	MainWindow.LoadedColorsDisplay.drag_source_set \
+	  (
+		start_button_mask = gtk.gdk.BUTTON1_MASK,
+		targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+		actions = gtk.gdk.ACTION_COPY
+	  )
 	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
 	MainWindow.Window.add(MainPlusMenuBox)
 	MainWindow.Window.show_all()
