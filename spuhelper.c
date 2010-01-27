@@ -32,21 +32,21 @@ static void extract_hsv
 		v0 = r;
 		v1 = g;
 		v2 = b;
-		hoffset = 65536 / 6;
+		hoffset = 0;
 	  }
 	else if (g >= r && g >= b)
 	  {
 		v0 = g;
 		v1 = b;
 		v2 = r;
-		hoffset = 65536 / 2;
+		hoffset = 65536 / 3;
 	  }
 	else /* b >= r && b >= g */
 	  {
 		v0 = b;
 		v1 = r;
 		v2 = g;
-		hoffset = 65536 * 5 / 6;
+		hoffset = 65536 * 2 / 3;
 	  } /*if*/
 	if (v0 != 0)
 	  {
