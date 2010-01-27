@@ -750,17 +750,19 @@ def SelectLoadColors(TheWindow) :
 				line = PaletteFile.readline()
 				if len(line) == 0 :
 					break
-				line = line.rstrip("\n")
-				components = line.split("\t", 1)
-				if len(components) == 1 :
-					components.append("") # empty name
+				if not line.startswith("#") :
+					line = line.rstrip("\n")
+					components = line.split("\t", 1)
+					if len(components) == 1 :
+						components.append("") # empty name
+					#end if
+					try :
+						color = tuple(int(i.strip()) for i in components[0].split(None, 2))
+					except ValueError :
+						raise Failure("bad colour on line %s" % repr(line))
+					#end try
+					Colors.append((color, components[1]))
 				#end if
-				try :
-					color = tuple(int(i.strip()) for i in components[0].split(None, 2))
-				except ValueError :
-					raise Failure("bad colour on line %s" % repr(line))
-				#end try
-				Colors.append((color, components[1]))
 			#end while
 		  # all successfully loaded
 			MainWindow.LoadedColorsList.clear()
