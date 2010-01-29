@@ -32,6 +32,50 @@ import spuhelper
 # Miscellaneous useful stuff
 #-
 
+class xdg_base_dir :
+	"Implementation of relevant parts of the XDG Base Directory specification" \
+	" <http://standards.freedesktop.org/basedir-spec/latest/>."
+
+	@classmethod
+	def get_config_home(self) :
+		"""returns the directory for holding user-specific config files."""
+		result = os.environ.get("XDG_CONFIG_HOME")
+		if result == None :
+			result = os.path.join(os.environ["HOME"], ".config")
+		#end if
+		return result
+	#end get_config_home
+
+	@classmethod
+	def config_search_path(self) :
+		"""returns the list of config directories to search (apart from the user area)."""
+		return tuple(os.environ.get("XDG_CONFIG_DIRS", "/etc").split(":"))
+		  # note spec actually says default should be /etc/xdg, but /etc is the
+		  # conventional location for system config files.
+	#end config_search_path
+
+	@classmethod
+	def find_first_config_path(self, path) :
+		"""searches for path in all the config directory locations in order of decreasing
+		priority, returning the expansion where it is first found, or None if not found."""
+		paths_to_try = iter((self.get_config_home(),) + self.config_search_path())
+			# highest priority first
+		while True :
+			try :
+				this_path = paths_to_try.next()
+			except StopIteration :
+				this_path = None
+				break
+			#end try
+			this_path = os.path.join(this_path, path)
+			if os.path.exists(this_path) :
+				break
+		#end while
+		return this_path
+	#end find_first_config_path
+
+#end xdg_base_dir
+
 class Failure(Exception) :
 
 	def __init__(self, Msg) :
@@ -64,6 +108,29 @@ def RectMatrix(SrcRect, DstRect) :
 	Result.translate(DstRect[0], DstRect[1])
 	return Result
 #end RectMatrix
+
+valid_video_formats = frozenset(("NTSC", "PAL"))
+
+def get_default_video_format() :
+	video_format = os.environ.get("VIDEO_FORMAT")
+	if video_format == None :
+		config_file = xdg_base_dir.find_first_config_path("video_format")
+		if config_file != None :
+			try :
+				video_format = open(config_file, "r").readline().strip()
+			except IOError :
+				video_format = None
+			#end try
+		#end if
+	#end if
+	if video_format != None :
+		video_format = video_format.upper()
+		if video_format not in valid_video_formats :
+			video_format = None
+		#end if
+	#end if
+	return video_format
+#end get_default_video_format
 
 #+
 # Useful GUI stuff
@@ -1030,8 +1097,13 @@ def SelectSaveMenu(TheWindow) :
 			0, 1, 3, 4
 		  )
 		FormatSelector = gtk.combo_box_new_text()
-		FormatSelector.append_text("NTSC")
-		FormatSelector.append_text("PAL")
+		default_video_format = get_default_video_format()
+		for i, video_format in enumerate(sorted(valid_video_formats)) :
+			FormatSelector.append_text(video_format)
+			if video_format == default_video_format :
+				FormatSelector.set_active(i)
+			#end if
+		#end for
 		ExtraBox.attach \
 		  (
 			FormatSelector,
