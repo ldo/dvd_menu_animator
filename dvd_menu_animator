@@ -946,6 +946,177 @@ def ImageClickEvent(TheWidget, TheEvent) :
 	return Handled
 #end ImageClickEvent
 
+def SelectSaveMenu(TheWindow) :
+	# lets the user specify a file name for saving the completely-built
+	# spumux control file and associated menu image files.
+
+	TheDialog = None
+	ExtraFileNames = {}
+	class Context :
+		SynchronizeTask = None
+	#end Context
+
+	def SynchronizeNames() :
+		BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
+		for Suffix in ("normal", "highlighted", "selected") :
+			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
+		#end for
+		return False # one-off timeout invocation
+	#end SynchronizeNames
+
+	def ForgetSynchronize() :
+		# loses the synchronization task, if it hasn't triggered yet
+		if Context.SynchronizeTask != None :
+			glib.source_remove(Context.SynchronizeTask)
+			Context.SynchronizeTask = None
+		#end if
+	#end ForgetSynchronize
+
+	def SaveKeyPress(TheWidget, TheEvent) :
+		if TheEvent.type == gtk.gdk.KEY_PRESS :
+			sys.stderr.write \
+			  (
+				"SaveKeyPress state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+			  ) # debug
+			# Need to call SynchronizeNames _after_ the file chooser has processed this
+			# keystroke. Only I way I can think of to get control at that point is by
+			# a delayed task.
+			ForgetSynchronize()
+			Context.SynchronizeTask = glib.timeout_add \
+			  (
+				int(round(0.1 * 1000)),
+				SynchronizeNames
+			  )
+		#end if
+	#end SaveKeyPress
+
+#begin SelectSaveMenu
+	if LoadedImage.Contents != None :
+		TheDialog = gtk.FileChooserDialog \
+		  (
+			title = "Save Menu As:",
+			action = gtk.FILE_CHOOSER_ACTION_SAVE,
+			buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+		  )
+		ExtraBox = gtk.Table(rows = 4, columns = 4, homogeneous = True)
+		  # extra columns just to get cell sizes looking right
+		ExtraNamesPrompts = \
+			{
+				"normal" : "Normal Image: ",
+				"highlighted" : "Highlighted Image: ",
+				"selected" : "Selected Image: ",
+			}
+		for Row, Suffix in enumerate(("normal", "highlighted", "selected")) :
+			NameLabel = gtk.Label(ExtraNamesPrompts[Suffix])
+			NameLabel.set_alignment(0, 0.5)
+			ExtraBox.attach \
+			  (
+				NameLabel,
+				0, 1, Row, Row + 1
+			  )
+			ExtraFileNames[Suffix] = gtk.Label()
+			ExtraFileNames[Suffix].set_alignment(0, 0.5)
+			ExtraBox.attach \
+			  (
+				ExtraFileNames[Suffix],
+				1, 2, Row, Row + 1
+			  )
+		#end if
+		NameLabel = gtk.Label("Video Format: ")
+		NameLabel.set_alignment(0, 0.5)
+		ExtraBox.attach \
+		  (
+			NameLabel,
+			0, 1, 3, 4
+		  )
+		FormatSelector = gtk.combo_box_new_text()
+		FormatSelector.append_text("NTSC")
+		FormatSelector.append_text("PAL")
+		ExtraBox.attach \
+		  (
+			FormatSelector,
+			1, 2, 3, 4
+		  )
+		ExtraBox.show_all()
+		TheDialog.set_extra_widget(ExtraBox)
+		TheDialog.connect("key-press-event", SaveKeyPress)
+		BaseFileName = os.path.splitext(os.path.basename(LoadedImage.FileName))[0]
+		TheDialog.set_current_name(BaseFileName + ".xml")
+		# SynchronizeNames doesn't work (TheDialog.get_filename() returns None at this point)
+		for Suffix in ("normal", "highlighted", "selected") :
+			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
+		#end for
+		while True :
+			Response = TheDialog.run()
+			ForgetSynchronize()
+			if Response != gtk.RESPONSE_OK :
+				MenuFileName = None
+				break
+			#end if
+			SynchronizeNames()
+			try :
+				if FormatSelector.get_active_text() not in ("NTSC", "PAL") :
+					raise Failure("You must choose a video format.")
+				#end if
+				MenuFileName = TheDialog.get_filename()
+				ParentDir = os.path.dirname(MenuFileName)
+				ImageNormalName, ImageHighlightedName, ImageSelectedName = tuple \
+					(
+						os.path.join(ParentDir, f)
+						for f in
+							(
+								ExtraFileNames[Suffix].get_text()
+								for Suffix in ("normal", "highlighted", "selected")
+							)
+					)
+				sys.stderr.write \
+				  (
+						"save fmt = %(format)s, ctl => %(ctl)s, normal => %(normal)s,"
+						" hilite => %(hilite)s, select => %(select)s\n"
+					%
+						{
+							"format" : FormatSelector.get_active_text(),
+							"ctl" : MenuFileName,
+							"normal" : ImageNormalName,
+							"hilite" : ImageHighlightedName,
+							"select" : ImageSelectedName,
+						}
+				  )
+				Overwriting = list \
+				  (
+					os.path.basename(f)
+						for f in
+							(MenuFileName, ImageNormalName, ImageHighlightedName, ImageSelectedName)
+						if os.path.exists(f)
+				  )
+				if len(Overwriting) == 0 :
+					break
+				ConfirmDialog = gtk.MessageDialog \
+				  (
+					flags = gtk.DIALOG_MODAL,
+					buttons = gtk.BUTTONS_OK_CANCEL,
+					type = gtk.MESSAGE_QUESTION,
+					message_format =
+						"File(s) already exist: %s. Overwrite?" % ", ".join(Overwriting)
+				  )
+				Response = ConfirmDialog.run()
+				ConfirmDialog.destroy()
+				if Response == gtk.RESPONSE_OK :
+					break
+			except Failure, Reason :
+				ErrorAlert(Reason.Msg)
+				# and keep prompting user for save filenames
+			#end try
+		#end while
+		TheDialog.destroy()
+		if MenuFileName != None :
+			pass # TBD save at this point
+		#end if
+	else :
+		ErrorAlert("Nothing to save.")
+	#end if
+#end SelectSaveMenu
+
 def AboutMe(TheWindow) :
 	# displays a dialog showing information about the program.
 	About = gtk.AboutDialog()
@@ -979,6 +1150,8 @@ def SetupMainWindow() :
 	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
 	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
 	NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
+	NewMenuSeparatorItem(FileMenu)
+	NewMenuItem(FileMenu, "Save Menu...", MenuAccelGroup, "S", SelectSaveMenu)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
 	HelpMenu = NewMenu(MainMenuBar, "Help")
