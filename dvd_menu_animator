@@ -95,6 +95,10 @@ class keyval :
 	"""are there official symbolic names for these anywhere?"""
 	returnkey = 0xff0d
 	enterkey = 0xff8d
+	leftkey = 65361
+	upkey = 65362
+	rightkey = 65363
+	downkey = 65364
 #end keyval
 
 select_delay = 0.25
@@ -728,14 +732,31 @@ def FindButtons() :
 	if TheLayer != None :
 		for Button in TheLayer.findall("{%s}rect" % ns.svg) :
 			ButtonName = Button.get("id")
-			ButtonBounds = \
-				(
-					float(Button.get("x")),
-					float(Button.get("y")),
-					float(Button.get("width")),
-					float(Button.get("height")),
-				)
-			MainWindow.ButtonList.append((ButtonName, ButtonBounds))
+			ButtonInfo = \
+				{
+					"bounds" :
+						(
+							float(Button.get("x")),
+							float(Button.get("y")),
+							float(Button.get("width")),
+							float(Button.get("height")),
+						),
+				}
+			Desc = Button.find("{%s}desc" % ns.svg)
+			if Desc != None :
+				for Entry in Desc.text.split("\n") :
+					Entry = Entry.split("=", 1)
+					if len(Entry) == 2 :
+						Key, Value = Entry
+						if Key == "action" :
+							ButtonInfo["auto"] = Value == "auto"
+						elif Key in ("up", "down", "left", "right") :
+							ButtonInfo[Key] = Value
+						#end if
+					#end if
+				#end for
+			#end if
+			MainWindow.ButtonList.append((ButtonName, ButtonInfo))
 		#end for
 	#end if
 #end FindButtons()
@@ -963,20 +984,19 @@ def ImageClickEvent(TheWidget, TheEvent) :
 			if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
 				BlinkHighlightedButton()
 			#end if
-			# TBD button navigation, left = 65361, up = 65362, right = 65363, down = 65364
+			# TBD button navigation
 			Handled = True
 		#end if
 		if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
-			# TBD do buttons in reverse order to pick up topmost one
-			FindButton = iter(MainWindow.ButtonList)
+			# do buttons in reverse order to pick up topmost one
+			ButtonIndex = len(MainWindow.ButtonList)
 			while True :
-				try :
-					ThisButton = FindButton.next()
-				except StopIteration :
+				if ButtonIndex == 0 :
 					ThisButton = None
 					break
-				#end try
-				ThisButton = ThisButton[1]
+				#end if
+				ButtonIndex -= 1
+				ThisButton = MainWindow.ButtonList[ButtonIndex][1]["bounds"]
 				ThisButton = \
 					(
 						ThisButton[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
@@ -1272,7 +1292,7 @@ def SetupMainWindow() :
 	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
 	  # first col is display name, second is layer ID
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-	  # first col is button id/name, second is bounds tuple
+	  # first col is button id/name, second is dictionary containing bounds and other info
 	MainWindow.ButtonHighlightRect = None
 	  # area to draw in highlighted/selected colours
 	MainWindow.ButtonSelected = False
