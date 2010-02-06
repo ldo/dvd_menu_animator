@@ -512,7 +512,7 @@ def DisplayImage() :
 				)[LoadedImage.ColorShowing - 1]
 			Colors = tuple(Color[0] for Color in ColorList)
 			ImagePixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
-			if MainWindow.ButtonHighlightRect != None and LoadedImage.ColorShowing == 4 :
+			if MainWindow.ButtonHighlight != None and LoadedImage.ColorShowing == 4 :
 				HighlightPixels = spuhelper.expand_image \
 				  (
 					LoadedImage.IndexedImage,
@@ -970,8 +970,8 @@ def ImageClickEvent(TheWidget, TheEvent) :
 		elif TheEvent.type == gtk.gdk.FOCUS_CHANGE :
 			if not TheEvent.in_ :
 				ForgetButtonBlink()
-				if MainWindow.ButtonHighlightRect != None :
-					MainWindow.ButtonHighlightRect = None
+				if MainWindow.ButtonHighlight != None :
+					MainWindow.ButtonHighlight = None
 					DisplayImage()
 				#end if
 			#end if
@@ -981,10 +981,40 @@ def ImageClickEvent(TheWidget, TheEvent) :
 			  (
 				"key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
 			  ) # debug
+			Navigation = \
+				{
+					keyval.upkey : "up",
+					keyval.downkey : "down",
+					keyval.leftkey : "left",
+					keyval.rightkey : "right",
+				}
 			if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
 				BlinkHighlightedButton()
+			elif TheEvent.keyval in Navigation and MainWindow.ButtonHighlight != None :
+				NextButtonID = MainWindow.ButtonHighlight.get(Navigation[TheEvent.keyval])
+				NextButton = None
+				if NextButtonID != None :
+					for Button in iter(MainWindow.ButtonList) :
+						if Button[0] == NextButtonID :
+							NextButton = Button
+						#end if
+					#end for
+				#end if
+				if NextButton != None :
+					ForgetButtonBlink()
+					MainWindow.ButtonHighlight = NextButton[1]
+					Bounds = NextButton[1]["bounds"]
+					Bounds = \
+						(
+							Bounds[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+							Bounds[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+							Bounds[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+							Bounds[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+						)
+					MainWindow.ButtonHighlightRect = Bounds
+					DisplayImage()
+				#end if
 			#end if
-			# TBD button navigation
 			Handled = True
 		#end if
 		if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
@@ -996,35 +1026,37 @@ def ImageClickEvent(TheWidget, TheEvent) :
 					break
 				#end if
 				ButtonIndex -= 1
-				ThisButton = MainWindow.ButtonList[ButtonIndex][1]["bounds"]
-				ThisButton = \
+				ThisButton = MainWindow.ButtonList[ButtonIndex][1]
+				Bounds = ThisButton["bounds"]
+				Bounds = \
 					(
-						ThisButton[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-						ThisButton[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-						ThisButton[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-						ThisButton[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+						Bounds[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+						Bounds[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+						Bounds[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+						Bounds[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
 					)
 				if (
-						TheEvent.x >= ThisButton[0]
+						TheEvent.x >= Bounds[0]
 					and
-						TheEvent.x < ThisButton[0] + ThisButton[2]
+						TheEvent.x < Bounds[0] + Bounds[2]
 					and
-						TheEvent.y >= ThisButton[1]
+						TheEvent.y >= Bounds[1]
 					and
-						TheEvent.y < ThisButton[1] + ThisButton[3]
+						TheEvent.y < Bounds[1] + Bounds[3]
 				) :
 					break
 				#end if
 			#end while
-			if ThisButton != MainWindow.ButtonHighlightRect :
+			if ThisButton != MainWindow.ButtonHighlight :
 				ForgetButtonBlink()
-				MainWindow.ButtonHighlightRect = ThisButton
+				MainWindow.ButtonHighlight = ThisButton
+				MainWindow.ButtonHighlightRect = Bounds
 				DisplayImage()
 			#end if
 			# Handled = True
 		#end if
 		if TheEvent.type == gtk.gdk._2BUTTON_PRESS :
-			if MainWindow.ButtonHighlightRect != None :
+			if MainWindow.ButtonHighlight != None :
 				BlinkHighlightedButton()
 			#end if
 			# Handled = True
@@ -1293,8 +1325,8 @@ def SetupMainWindow() :
 	  # first col is display name, second is layer ID
 	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
 	  # first col is button id/name, second is dictionary containing bounds and other info
-	MainWindow.ButtonHighlightRect = None
-	  # area to draw in highlighted/selected colours
+	MainWindow.ButtonHighlight = None
+	  # button to draw in highlighted/selected colours
 	MainWindow.ButtonSelected = False
 	MainWindow.ButtonBlinkTask = None
 	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
