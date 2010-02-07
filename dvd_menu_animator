@@ -113,6 +113,18 @@ def RectMatrix(SrcRect, DstRect) :
 	return Result
 #end RectMatrix
 
+def MapButton(Bounds, SrcDimensions, DstDimensions) :
+	"""returns Bounds (l, t, w, h) mapped from SrcDimensions (w, h) to
+	DstDimensions (w, h)."""
+	return \
+		(
+			Bounds[0] * DstDimensions[0] / SrcDimensions[0],
+			Bounds[1] * DstDimensions[1] / SrcDimensions[1],
+			Bounds[2] * DstDimensions[0] / SrcDimensions[0],
+			Bounds[3] * DstDimensions[1] / SrcDimensions[1],
+		)
+#end MapButton
+
 valid_video_formats = frozenset(("NTSC", "PAL"))
 
 def get_default_video_format() :
@@ -1003,15 +1015,12 @@ def ImageClickEvent(TheWidget, TheEvent) :
 				if NextButton != None :
 					ForgetButtonBlink()
 					MainWindow.ButtonHighlight = NextButton[1]
-					Bounds = NextButton[1]["bounds"]
-					Bounds = \
-						(
-							Bounds[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-							Bounds[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-							Bounds[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-							Bounds[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-						)
-					MainWindow.ButtonHighlightRect = Bounds
+					MainWindow.ButtonHighlightRect = MapButton \
+					  (
+						Bounds = NextButton[1]["bounds"],
+						SrcDimensions = LoadedImage.SrcDimensions,
+						DstDimensions = LoadedImage.ImageDrawSize
+					  )
 					DisplayImage()
 				#end if
 			#end if
@@ -1028,13 +1037,12 @@ def ImageClickEvent(TheWidget, TheEvent) :
 				ButtonIndex -= 1
 				ThisButton = MainWindow.ButtonList[ButtonIndex][1]
 				Bounds = ThisButton["bounds"]
-				Bounds = \
-					(
-						Bounds[0] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-						Bounds[1] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-						Bounds[2] * LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-						Bounds[3] * LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-					)
+				Bounds = MapButton \
+				  (
+					Bounds = Bounds,
+					SrcDimensions = LoadedImage.SrcDimensions,
+					DstDimensions = LoadedImage.ImageDrawSize
+				  )
 				if (
 						TheEvent.x >= Bounds[0]
 					and
@@ -1179,7 +1187,8 @@ def SelectSaveMenu(TheWindow) :
 			#end if
 			SynchronizeNames()
 			try :
-				if FormatSelector.get_active_text() not in ("NTSC", "PAL") :
+				VideoFormat = FormatSelector.get_active_text()
+				if VideoFormat not in ("NTSC", "PAL") :
 					raise Failure("You must choose a video format.")
 				#end if
 				MenuFileName = TheDialog.get_filename()
@@ -1199,7 +1208,7 @@ def SelectSaveMenu(TheWindow) :
 						" hilite => %(hilite)s, select => %(select)s\n"
 					%
 						{
-							"format" : FormatSelector.get_active_text(),
+							"format" : VideoFormat,
 							"ctl" : MenuFileName,
 							"normal" : ImageNormalName,
 							"hilite" : ImageHighlightedName,
@@ -1234,7 +1243,114 @@ def SelectSaveMenu(TheWindow) :
 		#end while
 		TheDialog.destroy()
 		if MenuFileName != None :
-			pass # TBD save at this point
+			ImageBounds = {"NTSC" : (720, 480), "PAL" : (720, 576)}[VideoFormat]
+			ReferenceScale = ((4, 3), (16, 9))[LoadedImage.Widescreen]
+			ImageRefHeight = ImageBounds[0] / ReferenceScale[0] * ReferenceScale[1]
+			  # image height if pixels were square
+			ImageRowStride = ImageBounds[0] * 4
+			RGBPixels = array.array \
+			  (
+				"B",
+					(255, 255, 255, 255)
+				*
+					(ImageRowStride // 4 * ImageBounds[1])
+			  )
+			RGBPix = cairo.ImageSurface.create_for_data \
+			  (
+				RGBPixels, # data
+				cairo.FORMAT_ARGB32, # format
+				ImageBounds[0], # width
+				ImageBounds[1], # height
+				ImageRowStride # stride
+			  )
+			RGBRender = cairo.Context(RGBPix)
+			RGBRender.identity_matrix()
+			RGBRender.set_source_rgba(1, 1, 1, 1)
+			RGBRender.paint()
+			FitFactor = min \
+			  (
+				ImageBounds[0] / LoadedImage.SrcDimensions[0],
+				ImageRefHeight / LoadedImage.SrcDimensions[1],
+			  ) # make sure it's all visible
+			RGBRender.scale \
+			  (
+				FitFactor,
+				ImageBounds[1] / ImageRefHeight * FitFactor
+			  )
+			svg = rsvg.Handle(data = ImageAsSVG())
+			svg.render_cairo(RGBRender)
+			RGBPix.flush()
+			IndexedImage, _ = spuhelper.index_image(RGBPixels)
+			for \
+				Colors, ImageName \
+			in \
+				(
+					(MainWindow.ColorsNormalList, ImageNormalName),
+					(MainWindow.ColorsHighlightedList,ImageHighlightedName),
+					(MainWindow.ColorsSelectedList, ImageSelectedName),
+				) \
+			:
+				Colors = tuple(Color[0] for Color in Colors)
+				OutFile = open(ImageName, "w")
+				spuhelper.write_png \
+				  (
+					IndexedImage, # pixels array
+					ImageBounds[0], # width
+					Colors,
+					OutFile
+				  )
+				OutFile.flush()
+				OutFile.close()
+			#end for
+			subpictures = XMLElementTree.Element("subpictures")
+			stream = XMLElementTree.SubElement(subpictures, "stream")
+			spu = XMLElementTree.SubElement \
+			  (
+				parent = stream,
+				tag = "spu",
+				attrib =
+					{
+						"force" : "yes",
+						# "transparent"?
+						"start" : "00:00:00.0",
+						"end" : "00:00:00.0",
+						"image" : os.path.basename(ImageNormalName),
+						"highlight" : os.path.basename(ImageHighlightedName),
+						"select" : os.path.basename(ImageSelectedName),
+					}
+			  )
+			for Button in iter(MainWindow.ButtonList) :
+				ButtonSpec = Button[1]
+				Bounds = MapButton \
+				  (
+					Bounds = ButtonSpec["bounds"],
+					SrcDimensions = LoadedImage.SrcDimensions,
+					DstDimensions = ImageBounds
+				  )
+				ButtonAttrs = \
+					{
+						"name" : Button[0],
+						"x0" : str(int(Bounds[0])),
+						"y0" : str(int(Bounds[1]) & ~1),
+						"x1" : str(int(Bounds[0] + Bounds[2])),
+						"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
+					}
+				for Neighbour in ("up", "down", "left", "right") :
+					if ButtonSpec.has_key(Neighbour) :
+						ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # TBD check it exists?
+					#end if
+				#end for
+				ButtonTag = XMLElementTree.SubElement \
+				  (
+					parent = spu,
+					tag = ("button", "action")[ButtonSpec.get("auto", False)],
+					attrib = ButtonAttrs
+				  )
+			#end for
+			OutFile = open(MenuFileName, "w")
+			XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
+			OutFile.flush()
+			OutFile.close()
 		#end if
 	else :
 		ErrorAlert("Nothing to save.")

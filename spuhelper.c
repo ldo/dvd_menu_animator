@@ -8,6 +8,7 @@
 #include <Python.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <png.h>
 
 /*
 	Miscellaneous useful stuff
@@ -200,6 +201,89 @@ static bool GetBoolProperty
 	Py_XDECREF(PropValue);
 	return result;
   } /*GetBoolProperty*/
+
+static void ParseColorsTuple
+  (
+	PyObject * ColorTuple,
+	uint32_t * colors /* array of 4 elements */
+  )
+  /* parses ColorTuple as a tuple of 4 elements, each in turn being a tuple of
+	4 integers (r, g, b, a) each in the range [0 .. 255]. Puts the result as
+	Cairo-format pixel values into colors. */
+  {
+	PyObject * TheColors[4] = {0, 0, 0, 0};
+	unsigned int nrcolors, i, j, channel[4];
+	do /*once*/
+	  {
+		nrcolors = PyTuple_Size(ColorTuple);
+		if (PyErr_Occurred())
+			break;
+		if (nrcolors > 4)
+		  {
+			nrcolors = 4;
+		  } /*if*/
+		for (i = 0; i < nrcolors; ++i)
+		  {
+			TheColors[i] = PyTuple_GetItem(ColorTuple, i);
+		  } /*for*/
+		if (PyErr_Occurred())
+			break;
+		for (i = 0; i < nrcolors; ++i)
+		  {
+			Py_INCREF(TheColors[i]);
+		  } /*for*/
+		for (i = 0;;)
+		  {
+			if (i == nrcolors)
+				break;
+			for (j = 0;;)
+			  {
+				if (j == 4)
+					break;
+				PyObject * ColorObj = PyTuple_GetItem(TheColors[i], j);
+				if (PyErr_Occurred())
+					break;
+				const long chanval = PyInt_AsLong(ColorObj);
+				if (PyErr_Occurred())
+					break;
+				if (chanval < 0 || chanval > 255)
+				  {
+					PyErr_SetString
+					  (
+						PyExc_ValueError,
+						"colour components must be in [0 .. 255]"
+					  );
+					break;
+				  } /*if*/
+				channel[(j + 1) % 4] = chanval;
+				++j;
+			  } /*for*/
+			if (PyErr_Occurred())
+				break;
+			colors[i] =
+					channel[0] << 24
+				|
+					channel[1] << 16
+				|
+					channel[2] << 8
+				|
+					channel[3];
+			++i;
+		  } /*for*/
+		if (PyErr_Occurred())
+			break;
+		for (; i < 4; ++i)
+		  {
+		  /* fill unused entries with transparent colour */
+			colors[i] = 0;
+		  } /*if*/
+	  }
+	while (false);
+	for (i = 0; i < 4; ++i)
+	  {
+		Py_XDECREF(TheColors[i]);
+	  } /*for*/
+  } /*ParseColorsTuple*/
 
 /*
 	User-visible stuff
@@ -521,71 +605,9 @@ static PyObject * spuhelper_expand_image
 		GetBufferInfo(SrcArray, &srcpixaddr, &nrsrcpixbytes);
 		if (PyErr_Occurred())
 			break;
-		  {
-		  /* parse the colour specifications */
-			PyObject * TheColors[4] = {0, 0, 0, 0};
-			unsigned int i, j, channel[4];
-			do /*once*/
-			  {
-				for (i = 0; i < 4; ++i)
-				  {
-					TheColors[i] = PyTuple_GetItem(ColorTuple, i);
-				  } /*for*/
-				if (PyErr_Occurred())
-					break;
-				for (i = 0; i < 4; ++i)
-				  {
-					Py_INCREF(TheColors[i]);
-				  } /*for*/
-				for (i = 0;;)
-				  {
-					if (i == 4)
-						break;
-					for (j = 0;;)
-					  {
-						if (j == 4)
-							break;
-						PyObject * ColorObj = PyTuple_GetItem(TheColors[i], j);
-						if (PyErr_Occurred())
-							break;
-						const long chanval = PyInt_AsLong(ColorObj);
-						if (PyErr_Occurred())
-							break;
-						if (chanval < 0 || chanval > 255)
-						  {
-							PyErr_SetString
-							  (
-								PyExc_ValueError,
-								"colour components must be in [0 .. 255]"
-							  );
-							break;
-						  } /*if*/
-						channel[(j + 1) % 4] = chanval;
-						++j;
-					  } /*for*/
-					if (PyErr_Occurred())
-						break;
-					colors[i] =
-							channel[0] << 24
-						|
-							channel[1] << 16
-						|
-							channel[2] << 8
-						|
-							channel[3];
-					++i;
-				  } /*for*/
-				if (PyErr_Occurred())
-					break;
-			  }
-			while (false);
-			for (i = 0; i < 4; ++i)
-			  {
-				Py_XDECREF(TheColors[i]);
-			  } /*for*/
-			if (PyErr_Occurred())
-				break;
-		  }
+		ParseColorsTuple(ColorTuple, colors);
+		if (PyErr_Occurred())
+			break;
 		DstArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
 		if (DstArray == 0)
 			break;
@@ -823,6 +845,161 @@ static PyObject * spuhelper_cairo_to_gtk
 	return result;
   } /*spuhelper_cairo_to_gtk*/
 
+static PyObject * spuhelper_write_png
+  (
+	PyObject * self,
+	PyObject * args
+  )
+  /* writes a buffer of two-bit pixels to a PNG file. */
+  {
+	PyObject * result = 0;
+	PyObject * TheArray = 0;
+	PyObject * ColorTuple = 0;
+	PyObject * OutFile = 0;
+	unsigned long pixaddr, pixlen, pixwidth, pixstride, pixheight;
+	uint32_t colors[4];
+	png_structp pngcontext = 0;
+	png_infop pnginfo = 0;
+
+	void outfile_write
+	  (
+		png_structp pngcontext,
+		unsigned char * data,
+		size_t datasize
+	  )
+	  /* PNG data-output callback which passes the data to OutFile.write. */
+	  {
+		PyObject * BufString = 0;
+		PyObject * Result = 0;
+		do /*once*/
+		  {
+			BufString = PyString_FromStringAndSize((const char *)data, datasize);
+			if (BufString == 0)
+				break;
+			Result = PyObject_CallMethod(OutFile, "write", "O", BufString);
+		  }
+		while (false);
+		Py_XDECREF(BufString);
+		Py_XDECREF(Result);
+	  } /*outfile_write*/
+
+	do /*once*/
+	  {
+		if (!PyArg_ParseTuple(args, "OkOO", &TheArray, &pixwidth, &ColorTuple, &OutFile))
+			break;
+		Py_INCREF(TheArray);
+		Py_INCREF(ColorTuple);
+		Py_INCREF(OutFile);
+		GetBufferInfo(TheArray, &pixaddr, &pixlen);
+		if (PyErr_Occurred())
+			break;
+		pixstride = (pixwidth + 3) / 4;
+		pixheight = pixlen / pixstride;
+		ParseColorsTuple(ColorTuple, colors);
+		if (PyErr_Occurred())
+			break;
+		pngcontext = png_create_write_struct
+		  (
+			/*user_png_ver =*/ PNG_LIBPNG_VER_STRING,
+			/*error_ptr =*/ 0,
+			/*error_fn =*/ 0,
+			/*warn_fn =*/ 0
+		  );
+		if (pngcontext == 0)
+		  {
+			PyErr_NoMemory();
+			break;
+		  } /*if*/
+		pnginfo = png_create_info_struct(pngcontext);
+		if (pnginfo == 0)
+		  {
+			PyErr_NoMemory();
+			break;
+		  } /*if*/
+		png_set_write_fn
+		  (
+			/*png_ptr =*/ pngcontext,
+			/*io_ptr =*/ 0,
+			/*write_data_fn =*/ outfile_write,
+			/*output_flush_fn =*/ 0
+		  );
+		png_set_IHDR
+		  (
+			/*png_ptr =*/ pngcontext,
+			/*info_ptr =*/ pnginfo,
+			/*width =*/ pixwidth,
+			/*height =*/ pixheight,
+			/*bit_depth =*/ 2,
+			/*color_type =*/ PNG_COLOR_TYPE_PALETTE,
+			/*interlace_method =*/ PNG_INTERLACE_NONE,
+			/*compression_method =*/ PNG_COMPRESSION_TYPE_DEFAULT,
+			/*filter_method =*/ PNG_FILTER_TYPE_DEFAULT
+		  );
+		  {
+			png_color pngcolors[4];
+			unsigned char alpha[4];
+			unsigned int i;
+			for (i = 0; i < 4; ++i)
+			  {
+				pngcolors[i].red = colors[i] >> 16 & 255;
+				pngcolors[i].green = colors[i] >> 8 & 255;
+				pngcolors[i].blue = colors[i] & 255;
+				alpha[i] = colors[i] >> 24 & 255;
+			  } /*for*/
+			png_set_PLTE
+			  (
+				/*png_ptr =*/ pngcontext,
+				/*info_ptr =*/ pnginfo,
+				/*palette =*/ pngcolors,
+				/*num_palette =*/ 4
+			  );
+			png_set_tRNS
+			  (
+				/*png_ptr =*/ pngcontext,
+				/*info_ptr =*/ pnginfo,
+				/*trans =*/ alpha,
+				/*num_trans =*/ 4,
+				/*trans_values =*/ 0
+			  );
+		  }
+		png_write_info(pngcontext, pnginfo);
+		png_set_packswap(pngcontext);
+		  {
+			unsigned long row;
+			for (row = 0;;)
+			  {
+				if (row == pixheight)
+					break;
+				png_write_row
+				  (
+					/*png_ptr =*/ pngcontext,
+					/*row =*/ (png_bytep)(pixaddr + pixstride * row)
+				  );
+				if (PyErr_Occurred())
+					break;
+				++row;
+			  } /*for*/
+			if (PyErr_Occurred())
+				break;
+			png_write_end(pngcontext, pnginfo);
+		  }
+		if (PyErr_Occurred())
+			break;
+	  /* all done */
+		Py_INCREF(Py_None);
+		result = Py_None;
+	  }
+	while (false);
+	if (pngcontext != 0)
+	  {
+		png_destroy_write_struct(&pngcontext, &pnginfo);
+	  } /*if*/
+	Py_XDECREF(OutFile);
+	Py_XDECREF(ColorTuple);
+	Py_XDECREF(TheArray);
+	return result;
+  } /*spuhelper_write_png*/
+
 static PyMethodDef spuhelper_methods[] =
   {
 	{"index_image", spuhelper_index_image, METH_VARARGS,
@@ -848,6 +1025,11 @@ static PyMethodDef spuhelper_methods[] =
 		"cairo_to_gtk(array)\n"
 		"converts a buffer of RGBA-format pixels from Cairo (native-endian) ordering"
 		" to GTK Pixbuf (big-endian) ordering."
+	},
+	{"write_png", spuhelper_write_png, METH_VARARGS,
+		"write_png(array, width, colors, outfile)\n"
+		"writes a buffer of two-bit pixels, as previously generated by index_image,"
+			" to PNG format to outfile."
 	},
 	{0, 0, 0, 0} /* marks end of list */
   };
