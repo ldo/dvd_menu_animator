@@ -873,6 +873,8 @@ static PyObject * spuhelper_write_png
 		PyObject * Result = 0;
 		do /*once*/
 		  {
+			if (PyErr_Occurred())
+				break;
 			BufString = PyString_FromStringAndSize((const char *)data, datasize);
 			if (BufString == 0)
 				break;
