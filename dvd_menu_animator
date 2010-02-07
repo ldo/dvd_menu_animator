@@ -148,6 +148,10 @@ def get_default_video_format() :
 	return video_format
 #end get_default_video_format
 
+color_approx_count_factor = 19
+  # ignore excess colours provided they make up no more than a proportion
+  # 1 / count_factor of the pixels
+
 #+
 # Useful GUI stuff
 #-
@@ -469,9 +473,21 @@ def AnalyzeImage() :
 			  )
 		#end if
 	#end for
-	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix())
+	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix(), color_approx_count_factor)
 	LoadedImage.ColorShowing = 0
 	if LoadedImage.IndexedImage == None :
+		if True : # debug
+			PixTotal = 0
+			for Color in LoadedImage.Colors :
+				PixTotal += Color[1]
+			#end for
+			DebugColors = tuple((color, freq / PixTotal) for color, freq in LoadedImage.Colors[:4])
+			TopTotal = 0
+			for Color in DebugColors :
+				TopTotal += Color[1]
+			#end for
+			sys.stderr.write("top colours: %s = %.3f\n" % (repr(DebugColors), TopTotal)) # debug
+		#end if
 		Msg = \
 			(
 				"<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
@@ -1280,7 +1296,7 @@ def SelectSaveMenu(TheWindow) :
 			svg = rsvg.Handle(data = ImageAsSVG())
 			svg.render_cairo(RGBRender)
 			RGBPix.flush()
-			IndexedImage, _ = spuhelper.index_image(RGBPixels)
+			IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
 			for \
 				Colors, ImageName \
 			in \

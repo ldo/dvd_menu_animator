@@ -297,7 +297,7 @@ static PyObject * spuhelper_index_image
   /* computes a histogram of pixel frequency on an image, and also generates a
 	two-bit-per-pixel indexed version of the image if possible. */
   {
-	const unsigned long count_factor = 50;
+	unsigned long count_factor;
 	  /* ignore excess colours provided they make up no more than a proportion
 		1 / count_factor of the pixels */
 	PyObject * Result = 0;
@@ -314,7 +314,7 @@ static PyObject * spuhelper_index_image
 		ArrayModule = PyImport_ImportModule("array");
 		if (ArrayModule == 0)
 			break;
-		if (!PyArg_ParseTuple(args, "O", &SrcArray))
+		if (!PyArg_ParseTuple(args, "Ok", &SrcArray, &count_factor))
 			break;
 		Py_INCREF(SrcArray);
 		GetBufferInfo(SrcArray, &pixaddr, &nrpixbytes);
@@ -1005,7 +1005,7 @@ static PyObject * spuhelper_write_png
 static PyMethodDef spuhelper_methods[] =
   {
 	{"index_image", spuhelper_index_image, METH_VARARGS,
-		"index_image(array)\n"
+		"index_image(array, count_factor)\n"
 		"analyzes a buffer of RGBA-format pixels in Cairo (native-endian) ordering, and"
 		" returns a tuple of 2 elements, the first being a new array object containing"
 		" 2 bits per pixel, and the second being a tuple of corresponding colours."
