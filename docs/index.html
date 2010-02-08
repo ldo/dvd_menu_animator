@@ -1,0 +1,202 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+<TITLE>DVD Menu Animator User Guide</TITLE>
+
+<STYLE TYPE="text/css">
+div.h1
+  {
+	font-size : x-large;
+	font-weight : bold;
+	text-align : center;
+  } /*div.h1*/
+div.h2
+  {
+	font-size : large;
+	font-weight : bold;
+  } /*div.h2*/
+div.h3
+  {
+	font-weight : bold;
+  } /*div.h3*/
+
+a
+  {
+	font-weight : bold;
+	color : #000080;
+	text-decoration : none;
+  } /*a*/
+</STYLE>
+</HEAD>
+<BODY STYLE="background-color : #F4F4F0">
+
+<DIV CLASS="h1">DVD Menu Animator User Guide<BR>
+<A HREF="mailto:&quot;Lawrence D'Oliveiro&quot; &lt;ldo@geek-central.gen.nz&gt;">Lawrence D&#8217;Oliveiro</A><BR>
+2010 February 8</DIV>
+<DIV STYLE="position : fixed; height : auto; width : 20%; top : 1em; right : 1em; left : auto; background-color : #E8E8E0">Table of Contents
+<OL>
+<LI><A HREF="#Introduction">Introduction</A>
+<LI><A HREF="#Installation">Installation</A>
+<LI><A HREF="#Usage">Usage</A>
+<UL>
+<LI><A HREF="#UsingInkscape">Making a Menu in Inkscape</A>
+<LI><A HREF="#Animating">Animating Your Menu</A>
+<LI><A HREF="#Transparency">Using Transparency</A>
+<LI><A HREF="#Saving">Saving Your Menu</A>
+</UL>
+<LI><A HREF="#FAQ">Frequently-Asked Questions</A>
+</OL>
+</DIV>
+
+<DIV STYLE="width : 78%">
+
+<DIV CLASS="h2"><A NAME="Introduction"></A>Introduction</DIV>
+<P>DVD Menu Animator is a tool to aid in the design of
+<A HREF="http://wlug.org.nz/DVDVideo">DVD-Video</A> menus. It is meant to be used in
+conjunction with <A HREF="http://wlug.org.nz/dvdauthor">dvdauthor</A> and
+<A HREF="http://www.inkscape.org/">Inkscape</A>: you use Inkscape to do the main design of the
+menu appearance and button placement; choose additional highlight and selection colours
+in DVD Menu Animator; then put the results through the <TT>spumux</TT> tool (part of
+<TT>dvdauthor</TT>) to generate the menu.</P>
+
+<DIV CLASS="h2"><A NAME="Installation"></A>Installation</DIV>
+<P>DVD Menu Animator consists of two parts: the main program, which is a
+<A HREF="http://python.org/">Python</A> script, and a module referenced by that script,
+called <TT>spuhelper</TT>, which needs to be compiled.
+<P>(More instructions to come.)
+
+<DIV CLASS="h2"><A NAME="Usage"></A>Usage</DIV>
+<DIV CLASS="h3"><A NAME="UsingInkscape"></A>Making a Menu in Inkscape</DIV>
+<P>Start by creating a new drawing for your menu in Inkscape. The actual dimensions
+and measurement units don’t matter; what <I>does</I> matter is the <I>aspect ratio</I>
+(ratio of the width of the drawing to its height): this should be either 4:3 (narrowscreen)
+or 16:9 (widescreen). Typically you will want to match the aspect ratio of the video footage
+you are going to include on the DVD.</P>
+<P>There is no limit on the complexity of the designs you can create, fonts you can use
+etc, but bear the following in mind:</P>
+<UL>
+<LI>You can have no more than 4 different colours.
+<LI>If you use transparency effects, then the areas where objects with such effects
+overlap will add to the count of different colours.
+<LI>Don’t use gradients.
+</UL>
+<P>Your design must have a minimum of two layers (though it can use more). This is because
+DVD Menu Animator expects the topmost layer to contain information about the buttons in
+your menu. You can name the layers what you like, but it’s probably a good idea to name
+the topmost one something like “Buttons”, to help remind yourself what it’s for.
+<P>In the button layer, each button is represented as a rectangle object. (The DVD-Video
+spec requires buttons to be rectangles, which is why you can’t use any other shape.)
+The fill and stroke settings you assign to buttons don’t matter; I’d recommend an empty
+fill, and a thin stroke just sufficient so you can see the locations of the buttons against
+your underlying menu graphic, to verify that they are lined up properly, without obscuring
+too much of the actual graphic. Whether you set this layer to visible or not when you
+save the drawing also doesn’t matter (though of course it <I>does</I> matter for the other
+layers making up the menu image.) Use this layer only for defining the buttons, because
+anything else you put on it will be ignored.</P>
+<P>Oh, and colours you use on the button layer don’t count towards the 4-colour limit.</P>
+<P>Besides creating a rectangle for each button, you also have to give each button a unique name.
+To do this, click the button rectangle and select “Object Properties...”  from Inkscape’s
+Object menu. In the resulting dialog, enter the button name in the id field (the Label
+and Title are ignored):
+<P STYLE="text-align : center"><IMG SRC="object_properties.png"></P>
+<P>You can also define here which neighbouring buttons the user will go to from this one
+if they use the arrows on their remote. This information goes in the Description field,
+where you can specify any or all of the following, one to a line, in any order:
+<UL>
+<LI><TT>up=</TT><I>button_name</I>
+<LI><TT>down=</TT><I>button_name</I>
+<LI><TT>left=</TT><I>button_name</I>
+<LI><TT>right=</TT><I>button_name</I>
+</UL>
+<P>Note these settings are case-sensitive, and spaces are not allowed.
+<P><B>Don’t forget to click the “Set” button before closing this dialog</B>.
+<P>Once you’ve finished the above steps, save your Inkscape drawing and start up
+DVD Menu Animator.
+
+<DIV CLASS="h3"><A NAME="Animating"></A>Animating Your Menu</DIV>
+<P>In DVD Menu Animator, select “Load Menu Image...” under the File menu to load the
+SVG file you created with Inkscape. If all goes well, you should see it appear on the
+left side of the main DVD Menu Animator window:</P>
+<P STYLE="text-align : center"><IMG SRC="animator.png"></P>
+<P>Next to the image is a set of radio buttons title “Using Colours:”. This lets you
+display the menu image in its various states. We will come back to this in a moment.
+<P>To the right of these radio buttons are two lists, titled “Buttons” and “Button Layer”.
+You can verify that the “Buttons” list contains the names you assigned to your buttons.
+This list doesn’t serve any other purpose as the moment. The “Button Layer” list shows
+the layers in your drawing, with the topmost (button) layer already preselected. Don’t
+click in this list—I should probably get rid of it.
+<P>To the right of these is a tall, empty list. You can load a
+<A HREF="http://www.gimp.org/">GIMP</A>-format (.gpl) colour palette
+with the “Load Colours...” option under the File menu, and then drag colours to from here
+to the elements in the other colour lists.
+<P>Now we come to the three important colour lists, titled “Normal”, “Highlight” and
+“Select”. The first one contains the colours that will be used for all the buttons
+in their normal state; the second one will be used for the button that the user has
+currently highlighted with their remote; and the third one will be used to briefly
+display the highlighted button when the user hits the OK/Enter button. All three lists
+are initially populated with the original colours from your drawing, but you are free
+to change them.
+<P>You’ll note that the first list usually contains more than 4 colours. The additional
+ones are the result of <I>anti-aliasing</I> by the SVG renderer to make the graphics look
+smoother. Unfortunately, the DVD-Video spec doesn’t allow for such anti-aliasing, so
+DVD Menu Animator has to undo its effects, by mapping those extra colours onto the
+closest-available ones of the most popular 4 in the image (the first 4 entries in the list).
+Before doing so, it does a check that the image “predominantly” consists of just 4 colours
+(where “predominantly” means “at least 95% of the pixels”). If it does not, then you will
+see a message like this at the bottom of the main window:
+<BLOCKQUOTE><SPAN STYLE="color : #FF0000">852 colours is too many, mustn't exceed 4</SPAN>
+</BLOCKQUOTE>
+<P>and you will have to go back to Inkscape to simplify your menu graphic.
+<P>You can double-click the colours in these lists to bring up a chooser dialog that
+lets you change them; or you can drag and drop between entries in different lists, and
+also from the loaded-palette list at the right, as mentioned previously.
+<P>And now we come to those “Using Colours:” radio buttons I mentioned earlier. These
+let you display the menu graphic in the following states:
+<UL>
+<LI>Original—as you originally drew the image in Inkscape, complete with anti-aliasing
+applied.
+<LI>Normal—remapped down to the first 4 colours in the “Normal” list. If you haven’t
+changed those colours, then the main difference between this and the previous option
+is that this one has more prominent “jaggies” because there is no anti-aliasing.
+<LI>Highlighted—remapped to the colours in the “Highlight” list.
+<LI>Selected—remapped to the colours in the “Select” list.
+<LI>Live—allows you to actually click buttons in the menu to observe how it will
+behave in the final DVD-Video title. You can click within the area of a button within
+the menu image, and you can use the arrow keys to test out the navigation. And you
+can press Enter (or double-click) to briefly display the highlighted button in its
+“selected” colours.
+</UL>
+
+<DIV CLASS="h3"><A NAME="Transparency"></A>Transparency and Backgrounds</DIV>
+<P>DVD-Video allows colours in a menu to be partially or totally transparent. You can
+control this with the Opacity slider in the colour chooser that appears when you double-click
+a colour. For example, you might start out with a white background for your menu in Inkscape,
+but in DVD Video Animator you can turn this background transparent, so the actual video
+image for the menu shows through.
+<P>You can simulate the effect of a background video image in DVD Video Animator by
+selecting “Load Background Image...” from the File menu. This lets you load a JPEG image
+file that will show through transparent parts of the menu image. Of course a single still
+image is not the same as a fully-animated video, but it should still help give you some idea of
+how the final menu will look.
+
+<DIV CLASS="h3"><A NAME="Saving"></A>Saving Your Menu</DIV>
+<P>Once you’ve done all the tweaking you want to do, you can save your work by
+selecting “Save Menu...” from DVD Menu Animator’s File menu. This lets you choose a name
+for the XML file that it generates for you to input to spumux. This name is also used
+to automatically construct related names for the associated PNG images representing
+the actual menu image in its three states, which will be referenced from the XML file and
+generated at the same time.</P>
+<P>And here you also choose what video format (NTSC or PAL) your DVD-Video disc will be
+using, so it knows what pixel dimensions the final menu images should have (720x480 for NTSC,
+720x576 for PAL).</P>
+
+<DIV CLASS="h2"><A NAME="FAQ"></A>Frequently-Asked Questions</DIV>
+<P><B>Q: Text is displaying as solid black rectangles.</B></P>
+<P><B>A: </B>This is because Inkscape is using a tag that has not been accepted into current
+official SVG specifications to represent flowed text blocks. Go back to Inkscape, click on
+each problem text block in the drawing, and select “Convert to Text” from Inkscape’s Text menu.
+Save your changes, and re-open the drawing in DVD Menu Animator to see how it looks now.
+
+</DIV>
+</BODY>
+</HTML>
