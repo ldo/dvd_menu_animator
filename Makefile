@@ -1,3 +1,5 @@
+# This Makefile is now used for testing only.
+
 PYTHONVER=python2.5
 CFLAGS=-g -I/usr/include/${PYTHONVER} -fPIC -Wall
 
