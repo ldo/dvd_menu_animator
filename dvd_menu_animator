@@ -136,6 +136,17 @@ def MapButton(Bounds, SrcDimensions, DstDimensions) :
 		)
 #end MapButton
 
+def MapButtonRect(ButtonBounds, SrcBounds, DstBounds) :
+	"""returns ButtonBounds mapped from SrcBounds to DstBounds."""
+	return \
+		(
+			(ButtonBounds[0] - SrcBounds[0]) * DstBounds[2] / SrcBounds[2] + DstBounds[0],
+			(ButtonBounds[1] - SrcBounds[1]) * DstBounds[3] / SrcBounds[3] + DstBounds[1],
+			ButtonBounds[2] * DstBounds[2] / SrcBounds[2],
+			ButtonBounds[3] * DstBounds[3] / SrcBounds[3],
+		)
+#end MapButtonRect
+
 valid_video_formats = frozenset(("NTSC", "PAL"))
 
 def get_default_video_format() :
@@ -1016,10 +1027,12 @@ def ImageClickEvent(TheWidget, TheEvent) :
 			#end if
 			# Handled = True
 		elif TheEvent.type == gtk.gdk.KEY_PRESS :
-			sys.stderr.write \
-			  (
-				"key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
-			  ) # debug
+			if False :
+				sys.stderr.write \
+				  (
+					"key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+				  ) # debug
+			#end if
 			Navigation = \
 				{
 					keyval.upkey : "up",
@@ -1112,6 +1125,9 @@ def SelectSaveMenu(TheWindow) :
 
 	def SynchronizeNames() :
 		BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
+		if ExtraFileNames.has_key("letterbox") :
+			ExtraFileNames["letterbox"].set_text("%s-letterbox.xml" % (BaseFileName,))
+		#end if
 		for Suffix in ("normal", "highlighted", "selected") :
 			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
 		#end for
@@ -1128,10 +1144,12 @@ def SelectSaveMenu(TheWindow) :
 
 	def SaveKeyPress(TheWidget, TheEvent) :
 		if TheEvent.type == gtk.gdk.KEY_PRESS :
-			sys.stderr.write \
-			  (
-				"SaveKeyPress state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
-			  ) # debug
+			if False :
+				sys.stderr.write \
+				  (
+					"SaveKeyPress state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+				  ) # debug
+			#end if
 			# Need to call SynchronizeNames _after_ the file chooser has processed this
 			# keystroke. Only I way I can think of to get control at that point is by
 			# a delayed task.
@@ -1152,15 +1170,30 @@ def SelectSaveMenu(TheWindow) :
 			action = gtk.FILE_CHOOSER_ACTION_SAVE,
 			buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
 		  )
-		ExtraBox = gtk.Table(rows = 4, columns = 4, homogeneous = True)
-		  # extra columns just to get cell sizes looking right
+		ExtraRow = int(LoadedImage.Widescreen)
+		ExtraBox = gtk.Table \
+		  (
+			rows = 4 + ExtraRow,
+			columns = 4, # extra columns just to get cell sizes looking right
+			homogeneous = True
+		  )
 		ExtraNamesPrompts = \
 			{
+				"letterbox" : "Letterboxed Menu: ",
 				"normal" : "Normal Image: ",
 				"highlighted" : "Highlighted Image: ",
 				"selected" : "Selected Image: ",
 			}
-		for Row, Suffix in enumerate(("normal", "highlighted", "selected")) :
+		for \
+				Row, Suffix \
+			in \
+				enumerate \
+				  (
+						((), ("letterbox",))[LoadedImage.Widescreen]
+					+
+						("normal", "highlighted", "selected")
+				  ) \
+		:
 			NameLabel = gtk.Label(ExtraNamesPrompts[Suffix])
 			NameLabel.set_alignment(0, 0.5)
 			ExtraBox.attach \
@@ -1181,7 +1214,7 @@ def SelectSaveMenu(TheWindow) :
 		ExtraBox.attach \
 		  (
 			NameLabel,
-			0, 1, 3, 4
+			0, 1, 3 + ExtraRow, 4 + ExtraRow
 		  )
 		FormatSelector = gtk.combo_box_new_text()
 		default_video_format = get_default_video_format()
@@ -1194,7 +1227,7 @@ def SelectSaveMenu(TheWindow) :
 		ExtraBox.attach \
 		  (
 			FormatSelector,
-			1, 2, 3, 4
+			1, 2, 3 + ExtraRow, 4 + ExtraRow
 		  )
 		ExtraBox.show_all()
 		TheDialog.set_extra_widget(ExtraBox)
@@ -1202,6 +1235,9 @@ def SelectSaveMenu(TheWindow) :
 		BaseFileName = os.path.splitext(os.path.basename(LoadedImage.FileName))[0]
 		TheDialog.set_current_name(BaseFileName + ".xml")
 		# SynchronizeNames doesn't work (TheDialog.get_filename() returns None at this point)
+		if ExtraFileNames.has_key("letterbox") :
+			ExtraFileNames["letterbox"].set_text("%s-letterbox.xml" % (BaseFileName,))
+		#end if
 		for Suffix in ("normal", "highlighted", "selected") :
 			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
 		#end for
@@ -1213,13 +1249,22 @@ def SelectSaveMenu(TheWindow) :
 				break
 			#end if
 			SynchronizeNames()
-			try :
+			try : # validate user selection
 				VideoFormat = FormatSelector.get_active_text()
 				if VideoFormat not in ("NTSC", "PAL") :
 					raise Failure("You must choose a video format.")
 				#end if
 				MenuFileName = TheDialog.get_filename()
 				ParentDir = os.path.dirname(MenuFileName)
+				if LoadedImage.Widescreen :
+					LetterboxedMenuFileName = os.path.join \
+					  (
+						ParentDir,
+						ExtraFileNames["letterbox"].get_text()
+					  )
+				else :
+					LetterboxedMenuFileName = None
+				#end if
 				ImageNormalName, ImageHighlightedName, ImageSelectedName = tuple \
 					(
 						os.path.join(ParentDir, f)
@@ -1229,25 +1274,18 @@ def SelectSaveMenu(TheWindow) :
 								for Suffix in ("normal", "highlighted", "selected")
 							)
 					)
-				sys.stderr.write \
-				  (
-						"save fmt = %(format)s, ctl => %(ctl)s, normal => %(normal)s,"
-						" hilite => %(hilite)s, select => %(select)s\n"
-					%
-						{
-							"format" : VideoFormat,
-							"ctl" : MenuFileName,
-							"normal" : ImageNormalName,
-							"hilite" : ImageHighlightedName,
-							"select" : ImageSelectedName,
-						}
-				  )
 				Overwriting = list \
 				  (
 					os.path.basename(f)
 						for f in
-							(MenuFileName, ImageNormalName, ImageHighlightedName, ImageSelectedName)
-						if os.path.exists(f)
+							(
+								MenuFileName,
+								LetterboxedMenuFileName,
+								ImageNormalName,
+								ImageHighlightedName,
+								ImageSelectedName,
+							)
+						if f != None and os.path.exists(f)
 				  )
 				if len(Overwriting) == 0 :
 					break
@@ -1329,55 +1367,74 @@ def SelectSaveMenu(TheWindow) :
 				OutFile.flush()
 				OutFile.close()
 			#end for
-			subpictures = XMLElementTree.Element("subpictures")
-			stream = XMLElementTree.SubElement(subpictures, "stream")
-			spu = XMLElementTree.SubElement \
-			  (
-				parent = stream,
-				tag = "spu",
-				attrib =
-					{
-						"force" : "yes",
-						# "transparent"?
-						"start" : "00:00:00.0",
-						"end" : "00:00:00.0",
-						"image" : os.path.basename(ImageNormalName),
-						"highlight" : os.path.basename(ImageHighlightedName),
-						"select" : os.path.basename(ImageSelectedName),
-					}
-			  )
-			for Button in iter(MainWindow.ButtonList) :
-				ButtonSpec = Button[1]
-				Bounds = MapButton \
+			Letterboxed = False
+			while True : # write menu XML file(s)
+				if Letterboxed :
+					HeightMid = ImageBounds[1] / 2
+					HalfHeight = ImageBounds[1] / 2 * (9 / 16) / (3 / 4)
+					MenuBounds = \
+						(
+							0,
+							HeightMid - HalfHeight,
+							ImageBounds[0],
+							2 * HalfHeight
+						)
+				else :
+					MenuBounds = (0, 0) + ImageBounds
+				#end if
+				subpictures = XMLElementTree.Element("subpictures")
+				stream = XMLElementTree.SubElement(subpictures, "stream")
+				spu = XMLElementTree.SubElement \
 				  (
-					Bounds = ButtonSpec["bounds"],
-					SrcDimensions = LoadedImage.SrcDimensions,
-					DstDimensions = ImageBounds
+					parent = stream,
+					tag = "spu",
+					attrib =
+						{
+							"force" : "yes",
+							# "transparent"?
+							"start" : "00:00:00.0",
+							"end" : "00:00:00.0",
+							"image" : os.path.basename(ImageNormalName),
+							"highlight" : os.path.basename(ImageHighlightedName),
+							"select" : os.path.basename(ImageSelectedName),
+						}
 				  )
-				ButtonAttrs = \
-					{
-						"name" : Button[0],
-						"x0" : str(int(Bounds[0])),
-						"y0" : str(int(Bounds[1]) & ~1),
-						"x1" : str(int(Bounds[0] + Bounds[2])),
-						"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
-					}
-				for Neighbour in ("up", "down", "left", "right") :
-					if ButtonSpec.has_key(Neighbour) :
-						ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # TBD check it exists?
-					#end if
+				for Button in iter(MainWindow.ButtonList) :
+					ButtonSpec = Button[1]
+					Bounds = MapButtonRect \
+					  (
+						ButtonBounds = ButtonSpec["bounds"],
+						SrcBounds = (0, 0) + LoadedImage.SrcDimensions,
+						DstBounds = MenuBounds
+					  )
+					ButtonAttrs = \
+						{
+							"name" : Button[0],
+							"x0" : str(int(Bounds[0])),
+							"y0" : str(int(Bounds[1]) & ~1),
+							"x1" : str(int(Bounds[0] + Bounds[2])),
+							"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
+						}
+					for Neighbour in ("up", "down", "left", "right") :
+						if ButtonSpec.has_key(Neighbour) :
+							ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # TBD check it exists?
+						#end if
+					#end for
+					ButtonTag = XMLElementTree.SubElement \
+					  (
+						parent = spu,
+						tag = ("button", "action")[ButtonSpec.get("auto", False)],
+						attrib = ButtonAttrs
+					  )
 				#end for
-				ButtonTag = XMLElementTree.SubElement \
-				  (
-					parent = spu,
-					tag = ("button", "action")[ButtonSpec.get("auto", False)],
-					attrib = ButtonAttrs
-				  )
-			#end for
-			OutFile = open(MenuFileName, "w")
-			XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
-			OutFile.flush()
-			OutFile.close()
+				OutFile = open((MenuFileName, LetterboxedMenuFileName)[Letterboxed], "w")
+				XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
+				OutFile.flush()
+				OutFile.close()
+				if Letterboxed or not LoadedImage.Widescreen :
+					break
+				Letterboxed = True
+			#end while
 		#end if
 	else :
 		ErrorAlert("Nothing to save.")
@@ -1388,7 +1445,7 @@ def AboutMe(TheWindow) :
 	# displays a dialog showing information about the program.
 	About = gtk.AboutDialog()
 	About.set_name("DVD Menu Animator")
-	About.set_version("0.01")
+	About.set_version("0.02")
 	About.set_comments("A utility to ease the construction of DVD-Video menus")
 	About.set_copyright("© 2010 Lawrence D'Oliveiro")
 	# About.set_license("GPLv3+")
