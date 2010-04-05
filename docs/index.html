@@ -76,6 +76,8 @@ you are going to include on the DVD.</P>
 <P>There is no limit on the complexity of the designs you can create, fonts you can use
 etc, but bear the following in mind:</P>
 <UL>
+<LI>Don’t put stuff too close to the edges; allow a margin for
+<A HREF="http://en.wikipedia.org/wiki/Overscan">overscan</A>.
 <LI>You can have no more than 4 different colours.
 <LI>If you use transparency effects, then the areas where objects with such effects
 overlap will add to the count of different colours.
@@ -210,6 +212,18 @@ consisting of the word
 <P>or</P>
 <BLOCKQUOTE><TT>PAL</TT></BLOCKQUOTE>
 <P>When you next launch DVD Menu Animator, it will default to your chosen format.
+<P>More generally, DVD Menu Animator supports all the different ways of specifying this
+setting defined in the
+<A HREF="http://create.freedesktop.org/wiki/Video_Format_Pref">Video Format Preference</A>
+proposal.
+
+<P><B>Q: After saving a menu, I needed to go back to Inkscape to make some more changes.
+Is there a way to avoid re-specifying all the highlight and selection colours again?</B></P>
+
+<P><B>A: </B>Yes! After loading the updated SVG drawing into DVD Menu Animator, select
+“Load Saved Colours...” from the File menu, and choose the menu XML file that you previously
+saved. DVD Menu Animator will use this to find the associated
+PNG files, and reload their colour tables into the appropriate lists.
 
 </DIV>
 </BODY>
