@@ -27,7 +27,8 @@ import os
 import subprocess
 import re
 import array
-import xml.parsers.expat
+from xml.parsers.expat import \
+	ExpatError
 from xml.etree import \
 	ElementTree as XMLElementTree
 import cairo
@@ -349,17 +350,22 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 
 #end ColorCellRenderer
 
-def ErrorAlert(Msg) :
-	"""displays a simple modal alert error message box."""
+def MsgAlert(Msg, Type) :
+	"""displays a simple alert message with an OK button."""
 	TheDialog = gtk.MessageDialog \
 	  (
 		flags = gtk.DIALOG_MODAL,
 		buttons = gtk.BUTTONS_OK,
-		type = gtk.MESSAGE_ERROR,
+		type = Type,
 		message_format = Msg
 	  )
 	Response = TheDialog.run()
 	TheDialog.destroy()
+#end MsgAlert
+
+def ErrorAlert(Msg) :
+	"""displays a simple modal alert error message box."""
+	MsgAlert(Msg, gtk.MESSAGE_ERROR)
 #end ErrorAlert
 
 def ChooseOpenFile(Prompt, Filters) :
@@ -676,7 +682,7 @@ def LoadMenuImage(FileName) :
 	try :
 		try :
 			NewContents = XMLElementTree.parse(FileName)
-		except xml.parsers.expat.ExpatError :
+		except ExpatError :
 			raise Failure("Not a valid SVG file.")
 		#end try
 		NewLayers = {}
@@ -913,6 +919,92 @@ def SelectLoadColors(TheWindow) :
 		#end try
 	#end if
 #end SelectLoadColors
+
+def SelectLoadSavedColors(TheWindow) :
+	# lets the user choose a previously-saved menu XML file from which to reload
+	# the colour palettes.
+	MenuFileName = ChooseOpenFile \
+	  (
+		Prompt = "Choose Previously-Saved Menu File to Load",
+		Filters = (("XML Files", ("*.xml",)),)
+	  )
+	if MenuFileName != None :
+		try :
+			try :
+				MenuContents = XMLElementTree.parse(MenuFileName)
+			except ExpatError :
+				raise Failure("Not a valid XML file.")
+			#end try
+			FindTag = MenuContents.getroot()
+			if FindTag != None :
+				FindTag = FindTag.find("stream")
+			#end if
+			if FindTag != None :
+				FindTag = FindTag.find("spu")
+			#end if
+			if FindTag == None :
+				raise Failure("can't make sense of contents of menu XML file")
+			#end if
+			Succeeded = []
+			Failed = []
+			for \
+				Description, Attr, ColorList \
+			in \
+				(
+					("normal", "image", MainWindow.ColorsNormalList),
+					("highlighted", "highlight", MainWindow.ColorsHighlightedList),
+					("selected", "select", MainWindow.ColorsSelectedList),
+				) \
+			:
+				ImageName = FindTag.get(Attr)
+				if ImageName != None :
+					try :
+						if not ImageName.startswith("/") :
+							ImageName = os.path.join(os.path.dirname(MenuFileName), ImageName)
+						#end if
+						try :
+							ImageFile = open(ImageName, "r")
+						except IOError :
+							raise Failure("couldn't open %s" % ImageName)
+						#end try
+						try :
+							Colors = spuhelper.read_png_palette(ImageFile)
+						except RuntimeError :
+							raise Failure("couldn't make sense of %s" % ImageName)
+						#end try
+						if Colors == None :
+							raise Failure("no palette in PNG file %s" % ImageName)
+						#end if
+						sys.stderr.write("Colors for %s = %s\n" % (ImageName, repr(Colors))) # debug
+						for i, Color in enumerate(Colors[:4]) :
+							ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
+						#end for
+						Succeeded.append(Description)
+					except Failure :
+						Failed.append(ImageName)
+					#end try
+				#end if
+			#end for
+			Msg = \
+				(
+					("", "Successfully loaded: ")[len(Succeeded) != 0]
+				+
+					", ".join(Succeeded)
+				+
+					("", "; ")[len(Succeeded) != 0 and len(Failed) != 0]
+				+
+					("", "Failed to load: ")[len(Failed) != 0]
+				+
+					", ".join(Failed)
+				+
+					("", ".")[len(Succeeded) != 0 or len(Failed) != 0]
+				)
+			MsgAlert(Msg, gtk.MESSAGE_INFO)
+		except Failure, Reason :
+			ErrorAlert(Reason.Msg)
+		#end try
+	#end if
+#end SelectLoadSavedColors
 
 def LayerSelectionChanged(TheSelection) :
 	# called on a change to the selection of the button layer.
@@ -1351,7 +1443,7 @@ def SelectSaveMenu(TheWindow) :
 			in \
 				(
 					(MainWindow.ColorsNormalList, ImageNormalName),
-					(MainWindow.ColorsHighlightedList,ImageHighlightedName),
+					(MainWindow.ColorsHighlightedList, ImageHighlightedName),
 					(MainWindow.ColorsSelectedList, ImageSelectedName),
 				) \
 			:
@@ -1474,6 +1566,7 @@ def SetupMainWindow() :
 	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
 	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
 	NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
+	NewMenuItem(FileMenu, "Load Saved Colours...", MenuAccelGroup, "R", SelectLoadSavedColors)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Save Menu...", MenuAccelGroup, "S", SelectSaveMenu)
 	NewMenuSeparatorItem(FileMenu)
