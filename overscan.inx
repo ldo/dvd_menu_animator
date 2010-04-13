@@ -1,0 +1,17 @@
+<inkscape-extension>
+    <_name>Overscan Margins</_name>
+    <id>nz.gen.geek-central.inkscape.filter.overscan</id>
+    <dependency type="executable" location="extensions">overscan.py</dependency>
+    <dependency type="executable" location="extensions">inkex.py</dependency>
+    <param name="horizontal" type="string" _gui-text="Horizontal Margin %">3.0</param>
+    <param name="vertical" type="string" _gui-text="Vertical Margin %">3.0</param>
+    <effect>
+        <object-type>all</object-type>
+        <effects-menu>
+            <submenu _name="Video"/>
+        </effects-menu>
+    </effect>
+    <script>
+        <command reldir="extensions" interpreter="python">overscan.py</command>
+    </script>
+</inkscape-extension>
