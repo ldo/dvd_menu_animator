@@ -17,7 +17,7 @@ distutils.core.setup \
 	author = "Lawrence D'Oliveiro",
 	author_email = "ldo@geek-central.gen.nz",
 	url = "http://github.com/ldo/dvd_menu_animator",
-	scripts = ["dvd_menu_animator", "overscan_margins.py"],
+	scripts = ["dvd_menu_animator"],
 	ext_modules =
 		[
 			distutils.core.Extension
