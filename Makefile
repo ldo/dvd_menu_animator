@@ -9,6 +9,6 @@ spuhelper.so : spuhelper.o
 spuhelper.o : spuhelper.c
 
 clean :
-	rm -f spuhelper.so spuhelper.o
+	rm -f spuhelper.so spuhelper.o build/
 
 .PHONY : clean
