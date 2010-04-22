@@ -1,6 +1,6 @@
 #+
-# Distutils script to build and install DVD Menu Animator. Invoke from
-# the command line in this directory as follows:
+# Distutils script to build and install DVD Menu Animator and the Overscan Margins
+# plugin for Inkscape. Invoke from the command line in this directory as follows:
 #
 #     python setup.py install
 #
@@ -17,7 +17,7 @@ distutils.core.setup \
 	author = "Lawrence D'Oliveiro",
 	author_email = "ldo@geek-central.gen.nz",
 	url = "http://github.com/ldo/dvd_menu_animator",
-	scripts = ["dvd_menu_animator"],
+	scripts = ["dvd_menu_animator", "overscan_margins.py"],
 	ext_modules =
 		[
 			distutils.core.Extension
@@ -26,5 +26,9 @@ distutils.core.setup \
 				sources = ["spuhelper.c"],
 				libraries = ["png"],
 			  ),
+		],
+	data_files =
+		[
+			("/usr/share/inkscape/extensions", ["overscan_margins.py", "overscan_margins.inx"]),
 		],
   )
