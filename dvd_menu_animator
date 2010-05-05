@@ -44,6 +44,145 @@ import spuhelper
 # Miscellaneous useful stuff
 #-
 
+class Point :
+	"""two-dimensional points."""
+	# subset of the code from Linear2D
+
+	def __init__(self, h, v) :
+		(self.h, self.v) = (h, v)
+	#end __init__
+
+	def __neg__(self) :
+		"""reflect across origin."""
+		return Point \
+		  (
+			h = - self.h,
+			v = - self.v
+		  )
+	#end __neg__
+
+#end Point
+
+class Matrix :
+	"""a 3x3 matrix representing an arbitrary 2D linear transformation."""
+	# subset of the code from Linear2D
+
+	def __init__(self, xx, xy, x0, yx, yy, y0, u, v, w) :
+		self.xx = xx
+		self.xy = xy
+		self.x0 = x0
+		self.yx = yx
+		self.yy = yy
+		self.y0 = y0
+		self.u = u
+		self.v = v
+		self.w = w
+	#end __init__
+
+	@staticmethod
+	def identity() :
+		"""returns an identity matrix."""
+		return Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1)
+	#end identity
+
+	def __mul__(m1, m2) :
+		"""returns concatenation with another matrix."""
+		return Matrix \
+		  (
+			xx = m2.xx * m1.xx + m2.xy * m1.yx + m2.x0 * m1.u,
+			xy = m2.xx * m1.xy + m2.xy * m1.yy + m2.x0 * m1.v,
+			x0 = m2.xx * m1.x0 + m2.xy * m1.y0 + m2.x0 * m1.w,
+			yx = m2.yx * m1.xx + m2.yy * m1.yx + m2.y0 * m1.u,
+			yy = m2.yx * m1.xy + m2.yy * m1.yy + m2.y0 * m1.v,
+			y0 = m2.yx * m1.x0 + m2.yy * m1.y0 + m2.y0 * m1.w,
+			u = m2.u * m1.xx + m2.v * m1.yx + m2.w * m1.u,
+			v = m2.u * m1.xy + m2.v * m1.yy + m2.w * m1.v,
+			w = m2.u * m1.x0 + m2.v * m1.y0 + m2.w * m1.w,
+		  )
+	#end __mul__
+
+	@staticmethod
+	def translation(delta) :
+		"""returns a matrix that translates by the specified delta Point."""
+		return Matrix(1, 0, delta.h, 0, 1, delta.v, 0, 0, 1)
+	#end translation
+
+	@staticmethod
+	def scaling(factor) :
+		"""returns a matrix that scales by the specified Point factors."""
+		return Matrix(factor.h, 0, 0, 0, factor.v, 0, 0, 0, 1)
+	#end scaling
+
+	@staticmethod
+	def rotation(Angle) :
+		"""returns a matrix that rotates about the origin by the specified
+		angle in radians."""
+		cos = math.cos(Angle)
+		sin = math.sin(Angle)
+		return Matrix(cos, -sin, 0, sin, cos, 0, 0, 0, 1)
+	#end rotation
+
+	def __repr__(self) :
+		return \
+			(
+				"Matrix(%f, %f, %f, %f, %f, %f, %f, %f, %f)"
+			%
+				(
+					self.xx, self.xy, self.x0,
+					self.yx, self.yy, self.y0,
+					self.u, self.v, self.w,
+				)
+			)
+	#end __repr__
+
+#end Matrix
+
+def ToCairo(self) :
+	"""converts TheMatrix to a Cairo Matrix."""
+	return \
+		cairo.Matrix \
+		  (
+			xx = self.xx / self.w,
+			xy = self.xy / self.w,
+			x0 = self.x0 / self.w,
+			yx = self.yx / self.w,
+			yy = self.yy / self.w,
+			y0 = self.y0 / self.w
+		  )
+#end ToCairo
+
+def RectMatrix(SrcRect, DstRect) :
+	"""returns a Cairo matrix that maps the corners of SrcRect to DstRect."""
+	Result = cairo.Matrix()
+	Result.translate(- SrcRect[0], - SrcRect[1])
+	Result.scale(DstRect[2] / SrcRect[2], DstRect[3] / SrcRect[3])
+	Result.translate(DstRect[0], DstRect[1])
+	return Result
+#end RectMatrix
+
+def MapButton(Bounds, SrcDimensions, DstDimensions) :
+	"""returns Bounds (l, t, w, h) mapped from SrcDimensions (w, h) to
+	DstDimensions (w, h)."""
+	return \
+		(
+			Bounds[0] * DstDimensions[0] / SrcDimensions[0],
+			Bounds[1] * DstDimensions[1] / SrcDimensions[1],
+			Bounds[2] * DstDimensions[0] / SrcDimensions[0],
+			Bounds[3] * DstDimensions[1] / SrcDimensions[1],
+		)
+#end MapButton
+
+def MapButtonRect(ButtonBounds, SrcBounds, DstBounds) :
+	"""returns ButtonBounds mapped from SrcBounds to DstBounds."""
+	return \
+		(
+			(ButtonBounds[0] - SrcBounds[0]) * DstBounds[2] / SrcBounds[2] + DstBounds[0],
+			(ButtonBounds[1] - SrcBounds[1]) * DstBounds[3] / SrcBounds[3] + DstBounds[1],
+			ButtonBounds[2] * DstBounds[2] / SrcBounds[2],
+			ButtonBounds[3] * DstBounds[3] / SrcBounds[3],
+		)
+#end MapButtonRect
+
 class xdg_base_dir :
 	"Implementation of relevant parts of the XDG Base Directory specification" \
 	" <http://standards.freedesktop.org/basedir-spec/latest/>."
@@ -88,6 +227,35 @@ class xdg_base_dir :
 
 #end xdg_base_dir
 
+valid_video_formats = frozenset(("NTSC", "PAL"))
+
+def get_default_video_format() :
+	"implements the video-format preference proposal documented at" \
+	" <http://create.freedesktop.org/wiki/Video_Format_Pref>."
+	video_format = os.environ.get("VIDEO_FORMAT")
+	if video_format == None :
+		config_file = xdg_base_dir.find_first_config_path("video_format")
+		if config_file != None :
+			try :
+				video_format = open(config_file, "r").readline().strip()
+			except IOError :
+				video_format = None
+			#end try
+		#end if
+	#end if
+	if video_format != None :
+		video_format = video_format.upper()
+		if video_format not in valid_video_formats :
+			video_format = None
+		#end if
+	#end if
+	return video_format
+#end get_default_video_format
+
+color_approx_count_factor = 19
+  # ignore excess colours provided they make up no more than a proportion
+  # 1 / count_factor of the pixels
+
 class Failure(Exception) :
 
 	def __init__(self, Msg) :
@@ -115,65 +283,6 @@ class keyval :
 
 select_delay = 0.25
   # how long to display a button in the selected state
-
-def RectMatrix(SrcRect, DstRect) :
-	"""returns a Cairo matrix that maps the corners of SrcRect to DstRect."""
-	Result = cairo.Matrix()
-	Result.translate(- SrcRect[0], - SrcRect[1])
-	Result.scale(DstRect[2] / SrcRect[2], DstRect[3] / SrcRect[3])
-	Result.translate(DstRect[0], DstRect[1])
-	return Result
-#end RectMatrix
-
-def MapButton(Bounds, SrcDimensions, DstDimensions) :
-	"""returns Bounds (l, t, w, h) mapped from SrcDimensions (w, h) to
-	DstDimensions (w, h)."""
-	return \
-		(
-			Bounds[0] * DstDimensions[0] / SrcDimensions[0],
-			Bounds[1] * DstDimensions[1] / SrcDimensions[1],
-			Bounds[2] * DstDimensions[0] / SrcDimensions[0],
-			Bounds[3] * DstDimensions[1] / SrcDimensions[1],
-		)
-#end MapButton
-
-def MapButtonRect(ButtonBounds, SrcBounds, DstBounds) :
-	"""returns ButtonBounds mapped from SrcBounds to DstBounds."""
-	return \
-		(
-			(ButtonBounds[0] - SrcBounds[0]) * DstBounds[2] / SrcBounds[2] + DstBounds[0],
-			(ButtonBounds[1] - SrcBounds[1]) * DstBounds[3] / SrcBounds[3] + DstBounds[1],
-			ButtonBounds[2] * DstBounds[2] / SrcBounds[2],
-			ButtonBounds[3] * DstBounds[3] / SrcBounds[3],
-		)
-#end MapButtonRect
-
-valid_video_formats = frozenset(("NTSC", "PAL"))
-
-def get_default_video_format() :
-	video_format = os.environ.get("VIDEO_FORMAT")
-	if video_format == None :
-		config_file = xdg_base_dir.find_first_config_path("video_format")
-		if config_file != None :
-			try :
-				video_format = open(config_file, "r").readline().strip()
-			except IOError :
-				video_format = None
-			#end try
-		#end if
-	#end if
-	if video_format != None :
-		video_format = video_format.upper()
-		if video_format not in valid_video_formats :
-			video_format = None
-		#end if
-	#end if
-	return video_format
-#end get_default_video_format
-
-color_approx_count_factor = 19
-  # ignore excess colours provided they make up no more than a proportion
-  # 1 / count_factor of the pixels
 
 #+
 # Useful GUI stuff
@@ -278,7 +387,7 @@ def GetSingleListSelection(ListDisplay, Col) :
 class ColorCellRenderer(gtk.GenericCellRenderer) :
 	"""renders a list cell showing a colour with optional opacity."""
 
-	# def __init__(self) :
+	#def __init__(self) :
 	#     mustn't be present, or it doesn't get initialized properly
 	#end __init__
 
@@ -501,7 +610,8 @@ def AnalyzeImage() :
 			  )
 		#end if
 	#end for
-	LoadedImage.IndexedImage, LoadedImage.Colors = spuhelper.index_image(RenderImagePix(), color_approx_count_factor)
+	LoadedImage.IndexedImage, LoadedImage.Colors = \
+		spuhelper.index_image(RenderImagePix(), color_approx_count_factor)
 	LoadedImage.ColorShowing = 0
 	if LoadedImage.IndexedImage == None :
 		if True : # debug
@@ -630,7 +740,7 @@ def DisplayImage() :
 					(0, 0) + LoadedImage.ImageDrawSize,
 					(0, 0, LoadedImage.Background.get_width(), LoadedImage.Background.get_height())
 				  )
-			  )
+			  ) # distort as necessary to fit dimensions of menu
 			Composite.set_source(BackgroundPattern)
 			Composite.paint()
 		#end if
@@ -911,7 +1021,7 @@ def SelectLoadColors(TheWindow) :
 		  # all successfully loaded
 			MainWindow.LoadedColorsList.clear()
 			for color in Colors :
-				MainWindow.LoadedColorsList.append((color[0],)) # TBD display name as well
+				MainWindow.LoadedColorsList.append((color[0],)) # fixme display name as well
 			#end for
 			MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
 		except Failure, Reason :
@@ -1024,6 +1134,7 @@ def ColorDisplayChanged(TheButton, Index) :
 
 def EditColor(TreeView, ColorPath, ViewColumn) :
 	# called when an item in a colour list is double-clicked.
+	# fixme: should I be premultiplying alpha? libpng might not be expecting that.
 	ForgetButtonBlink()
 	if ColorPath[0] < 4 : # excess colours won't be saved anyway
 		ColorList = TreeView.get_model()
@@ -1210,15 +1321,41 @@ def SelectSaveMenu(TheWindow) :
 	# spumux control file and associated menu image files.
 
 	TheDialog = None
+	NormalLabelStyle = None
+	DimmedLabelStyle = None
 	ExtraFileNames = {}
+	SelectedAspects = [None, None]
+	GenerateMenu = [True, True] # whether to generate narrowscreen and widescreen versions of menu
 	class Context :
 		SynchronizeTask = None
 	#end Context
 
-	def SynchronizeNames() :
-		BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
+	def SelectedAspectToggled(TheButton, Which) :
+		GenerateMenu[Which] = TheButton.get_active()
+		for \
+			Suffix \
+		in \
+			(
+				((), ("letterbox",))[ExtraFileNames.has_key("letterbox")]
+			+
+				tuple(s + ("", "-letterboxed")[Which] for s in ("normal", "highlighted", "selected"))
+			) \
+		:
+			ExtraFileNames[Suffix].modify_style((DimmedLabelStyle, NormalLabelStyle)[GenerateMenu[Which]])
+		#end for
+	#end SelectedAspectToggled
+
+	def SynchronizeNames(BaseFileName) :
+		# synchronizes all automatically-generated file names with the one
+		# manually typed by the user.
+		if BaseFileName == None :
+			BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
+		#end if
 		if ExtraFileNames.has_key("letterbox") :
-			ExtraFileNames["letterbox"].set_text("%s-letterbox.xml" % (BaseFileName,))
+			ExtraFileNames["letterbox"].set_text("%s-letterboxed.xml" % (BaseFileName,))
+			for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
+				ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
+			#end for
 		#end if
 		for Suffix in ("normal", "highlighted", "selected") :
 			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
@@ -1235,6 +1372,8 @@ def SelectSaveMenu(TheWindow) :
 	#end ForgetSynchronize
 
 	def SaveKeyPress(TheWidget, TheEvent) :
+		# intercepts user text entry for the saved filename to keep the
+		# other generated filenames in sync.
 		if TheEvent.type == gtk.gdk.KEY_PRESS :
 			if False :
 				sys.stderr.write \
@@ -1249,7 +1388,8 @@ def SelectSaveMenu(TheWindow) :
 			Context.SynchronizeTask = glib.timeout_add \
 			  (
 				int(round(0.1 * 1000)),
-				SynchronizeNames
+				SynchronizeNames,
+				None
 			  )
 		#end if
 	#end SaveKeyPress
@@ -1262,51 +1402,112 @@ def SelectSaveMenu(TheWindow) :
 			action = gtk.FILE_CHOOSER_ACTION_SAVE,
 			buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
 		  )
-		ExtraRow = int(LoadedImage.Widescreen)
 		ExtraBox = gtk.Table \
 		  (
-			rows = 4 + ExtraRow,
+			rows = (4, 9)[LoadedImage.Widescreen],
 			columns = 4, # extra columns just to get cell sizes looking right
 			homogeneous = True
 		  )
-		ExtraNamesPrompts = \
-			{
-				"letterbox" : "Letterboxed Menu: ",
-				"normal" : "Normal Image: ",
-				"highlighted" : "Highlighted Image: ",
-				"selected" : "Selected Image: ",
-			}
+		FormatRow = (3, 9)[LoadedImage.Widescreen]
+		if LoadedImage.Widescreen :
+			# allow user to save 2 separate menu XML files with associated
+			# image files, one which displays full-height on all screens and
+			# one which displays letterboxed on 4:3 screens
+			ExtraNamesPrompts = \
+				{
+					"normal" : "Normal Image (Full-Height): ",
+					"highlighted" : "Highlighted Image (Full-Height): ",
+					"selected" : "Selected Image (Full-Height): ",
+					"letterbox" : "Letterboxed Menu: ",
+					"normal-letterboxed" : "Normal Image (Letterboxed): ",
+					"highlighted-letterboxed" : "Highlighted Image (Letterboxed): ",
+					"selected-letterboxed" : "Selected Image (Letterboxed): ",
+				}
+			SelectedAspects[False] = gtk.CheckButton("Save Full-Height Version")
+			SelectedAspects[False].set_active(True) # not default
+			SelectedAspects[False].connect("toggled", SelectedAspectToggled, False)
+			SelectedAspects[True] = gtk.CheckButton("Save Letterboxed Version")
+			SelectedAspects[True].set_active(True) # not default
+			SelectedAspects[True].connect("toggled", SelectedAspectToggled, True)
+			ExtraBox.attach \
+			  (
+				SelectedAspects[False],
+				0, 2, 0, 1
+			  )
+			ExtraBox.attach \
+			  (
+				SelectedAspects[True],
+				0, 2, 4, 5
+			  )
+		else :
+			ExtraNamesPrompts = \
+				{
+					"normal" : "Normal Image: ",
+					"highlighted" : "Highlighted Image: ",
+					"selected" : "Selected Image: ",
+				}
+		#end if
 		for \
 				Row, Suffix \
 			in \
 				enumerate \
 				  (
-						((), ("letterbox",))[LoadedImage.Widescreen]
+						(
+							(),
+							(None,), # checkbox goes here (above)
+						)[LoadedImage.Widescreen]
 					+
 						("normal", "highlighted", "selected")
+					+
+						(
+							(),
+							(
+								None, # checkbox goes here (above)
+								"letterbox",
+								"normal-letterboxed",
+								"highlighted-letterboxed",
+								"selected-letterboxed",
+							)
+						)[LoadedImage.Widescreen]
 				  ) \
 		:
-			NameLabel = gtk.Label(ExtraNamesPrompts[Suffix])
-			NameLabel.set_alignment(0, 0.5)
-			ExtraBox.attach \
+			if Suffix != None :
+				NameLabel = gtk.Label(ExtraNamesPrompts[Suffix])
+				NameLabel.set_alignment(0, 0.5)
+				ExtraBox.attach \
+				  (
+					NameLabel,
+					0, 1, Row, Row + 1
+				  )
+				ExtraFileNames[Suffix] = gtk.Label()
+				ExtraFileNames[Suffix].set_alignment(0, 0.5)
+				if NormalLabelStyle == None :
+					ExtraFileNames[Suffix].ensure_style()
+					NormalLabelStyle = ExtraFileNames[Suffix].get_style()
+				#end if
+				ExtraBox.attach \
+				  (
+					ExtraFileNames[Suffix],
+					1, 2, Row, Row + 1
+				  )
+			#end if
+		#end if
+		DimmedLabelStyle = gtk.RcStyle()
+		for State in (gtk.STATE_NORMAL,) : # no need for gtk.STATE_INSENSITIVE
+			DimmedLabelStyle.fg[State] = gtk.gdk.color_from_hsv \
 			  (
-				NameLabel,
-				0, 1, Row, Row + 1
-			  )
-			ExtraFileNames[Suffix] = gtk.Label()
-			ExtraFileNames[Suffix].set_alignment(0, 0.5)
-			ExtraBox.attach \
-			  (
-				ExtraFileNames[Suffix],
-				1, 2, Row, Row + 1
+				hue = NormalLabelStyle.fg[State].hue,
+				saturation = NormalLabelStyle.fg[State].saturation / 2,
+				value = 1.0 - (1.0 - NormalLabelStyle.fg[State].value) / 2
 			  )
 		#end if
+		NormalLabelStyle = gtk.RcStyle() # with no customizations
 		NameLabel = gtk.Label("Video Format: ")
 		NameLabel.set_alignment(0, 0.5)
 		ExtraBox.attach \
 		  (
 			NameLabel,
-			0, 1, 3 + ExtraRow, 4 + ExtraRow
+			0, 1, FormatRow, FormatRow + 1
 		  )
 		FormatSelector = gtk.combo_box_new_text()
 		default_video_format = get_default_video_format()
@@ -1319,64 +1520,54 @@ def SelectSaveMenu(TheWindow) :
 		ExtraBox.attach \
 		  (
 			FormatSelector,
-			1, 2, 3 + ExtraRow, 4 + ExtraRow
+			1, 2, FormatRow, FormatRow + 1
 		  )
 		ExtraBox.show_all()
 		TheDialog.set_extra_widget(ExtraBox)
 		TheDialog.connect("key-press-event", SaveKeyPress)
 		BaseFileName = os.path.splitext(os.path.basename(LoadedImage.FileName))[0]
 		TheDialog.set_current_name(BaseFileName + ".xml")
-		# SynchronizeNames doesn't work (TheDialog.get_filename() returns None at this point)
-		if ExtraFileNames.has_key("letterbox") :
-			ExtraFileNames["letterbox"].set_text("%s-letterbox.xml" % (BaseFileName,))
-		#end if
-		for Suffix in ("normal", "highlighted", "selected") :
-			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
-		#end for
+		SynchronizeNames(BaseFileName)
+		  # need to pass BaseFileName because TheDialog.get_filename() returns None at this point
+		MenuFileNames = [None, None]
+		GenerateMenu[True] = LoadedImage.Widescreen
 		while True :
 			Response = TheDialog.run()
 			ForgetSynchronize()
 			if Response != gtk.RESPONSE_OK :
-				MenuFileName = None
 				break
 			#end if
-			SynchronizeNames()
+			SynchronizeNames(None)
 			try : # validate user selection
+				if not (GenerateMenu[False] or GenerateMenu[True]) :
+					raise Failure("Nothing to do!")
+				#end if
 				VideoFormat = FormatSelector.get_active_text()
 				if VideoFormat not in ("NTSC", "PAL") :
 					raise Failure("You must choose a video format.")
 				#end if
-				MenuFileName = TheDialog.get_filename()
-				ParentDir = os.path.dirname(MenuFileName)
-				if LoadedImage.Widescreen :
-					LetterboxedMenuFileName = os.path.join \
+				ParentDir = os.path.dirname(TheDialog.get_filename())
+				ImageNames = {}
+				if GenerateMenu[False] :
+					MenuFileNames[False] = TheDialog.get_filename()
+					for Suffix in ("normal", "highlighted", "selected") :
+						ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
+					#end for
+				#end if
+				if GenerateMenu[True] :
+					MenuFileNames[True] = os.path.join \
 					  (
 						ParentDir,
 						ExtraFileNames["letterbox"].get_text()
 					  )
-				else :
-					LetterboxedMenuFileName = None
+					for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
+						ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
+					#end for
 				#end if
-				ImageNormalName, ImageHighlightedName, ImageSelectedName = tuple \
-					(
-						os.path.join(ParentDir, f)
-						for f in
-							(
-								ExtraFileNames[Suffix].get_text()
-								for Suffix in ("normal", "highlighted", "selected")
-							)
-					)
 				Overwriting = list \
 				  (
 					os.path.basename(f)
-						for f in
-							(
-								MenuFileName,
-								LetterboxedMenuFileName,
-								ImageNormalName,
-								ImageHighlightedName,
-								ImageSelectedName,
-							)
+						for f in tuple(MenuFileNames) + tuple(ImageNames.values())
 						if f != None and os.path.exists(f)
 				  )
 				if len(Overwriting) == 0 :
@@ -1399,16 +1590,23 @@ def SelectSaveMenu(TheWindow) :
 			#end try
 		#end while
 		TheDialog.destroy()
-		if MenuFileName != None :
+		FillColor = LoadedImage.Colors[0][0] # so leftover pixels get most popular colour
+		# convert native-endian Cairo format
+		if sys.byteorder == "big" :
+			FillColor = (FillColor[3], FillColor[0], FillColor[1], FillColor[2])
+		else :
+			FillColor = (FillColor[2], FillColor[1], FillColor[0], FillColor[3])
+		#end if
+		if MenuFileNames[False] != None :
 			ImageBounds = {"NTSC" : (720, 480), "PAL" : (720, 576)}[VideoFormat]
 			ReferenceScale = ((4, 3), (16, 9))[LoadedImage.Widescreen]
 			ImageRefHeight = ImageBounds[0] / ReferenceScale[0] * ReferenceScale[1]
 			  # image height if pixels were square
-			ImageRowStride = ImageBounds[0] * 4
+			ImageRowStride = ImageBounds[0] * 4 # fixme: use format_stride_for_width
 			RGBPixels = array.array \
 			  (
 				"B",
-					(255, 255, 255, 255)
+					FillColor
 				*
 					(ImageRowStride // 4 * ImageBounds[1])
 			  )
@@ -1421,108 +1619,154 @@ def SelectSaveMenu(TheWindow) :
 				ImageRowStride # stride
 			  )
 			RGBRender = cairo.Context(RGBPix)
-			RGBRender.identity_matrix()
-			RGBRender.set_source_rgba(1, 1, 1, 1)
-			RGBRender.paint()
-			FitFactor = min \
-			  (
-				ImageBounds[0] / LoadedImage.SrcDimensions[0],
-				ImageRefHeight / LoadedImage.SrcDimensions[1],
-			  ) # make sure it's all visible
-			RGBRender.scale \
-			  (
-				FitFactor,
-				ImageBounds[1] / ImageRefHeight * FitFactor
-			  )
-			svg = rsvg.Handle(data = ImageAsSVG())
-			svg.render_cairo(RGBRender)
-			RGBPix.flush()
-			IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
-			for \
-				Colors, ImageName \
-			in \
-				(
-					(MainWindow.ColorsNormalList, ImageNormalName),
-					(MainWindow.ColorsHighlightedList, ImageHighlightedName),
-					(MainWindow.ColorsSelectedList, ImageSelectedName),
-				) \
-			:
-				Colors = tuple(Color[0] for Color in Colors)
-				OutFile = open(ImageName, "w")
-				spuhelper.write_png \
-				  (
-					IndexedImage, # pixels array
-					ImageBounds[0], # width
-					Colors,
-					OutFile
-				  )
-				OutFile.flush()
-				OutFile.close()
-			#end for
-			Letterboxed = False
-			while True : # write menu XML file(s)
-				if Letterboxed :
-					HeightMid = ImageBounds[1] / 2
-					HalfHeight = ImageBounds[1] / 2 * (9 / 16) / (3 / 4)
-					MenuBounds = \
+			Letterboxed = False # which version of menu I'm generating
+			while True : # write menu XML file(s) and associated image files
+				if GenerateMenu[Letterboxed] :
+					FitFactor = min \
+					  (
+						ImageBounds[0] / LoadedImage.SrcDimensions[0],
+						ImageRefHeight / LoadedImage.SrcDimensions[1],
+					  ) # make sure it's all visible
+					RGBRender.set_matrix \
+					  (
+						ToCairo
+						  (
+							Matrix.scaling(Point
+							  (
+								FitFactor,
+								ImageBounds[1] / ImageRefHeight * FitFactor
+							  ))
+						  )
+					  )
+					svg = rsvg.Handle(data = ImageAsSVG())
+					svg.render_cairo(RGBRender)
+					RGBPix.flush()
+					if Letterboxed :
+						# squeeze menu image down to letterboxed height
+						HeightMid = ImageBounds[1] / 2
+						HalfHeight = ImageBounds[1] / 2 * (9 / 16) / (3 / 4)
+						MenuBounds = \
+							(
+								0,
+								HeightMid - HalfHeight,
+								ImageBounds[0],
+								2 * HalfHeight
+							)
+						ToMiddle = Point(0, HeightMid)
+						NewRenderPixels = array.array \
+						  (
+							"B",
+								FillColor
+							*
+								(ImageRowStride // 4 * ImageBounds[1])
+						  )
+						NewRenderPix = cairo.ImageSurface.create_for_data \
+						  (
+							NewRenderPixels, # data
+							cairo.FORMAT_ARGB32, # format
+							ImageBounds[0], # width
+							ImageBounds[1], # height
+							ImageRowStride # stride
+						  )
+						NewRender = cairo.Context(NewRenderPix)
+						NewRender.set_matrix \
+						  (
+							ToCairo
+							  (
+									Matrix.translation(- ToMiddle)
+								*
+									Matrix.scaling(Point(1, (9 / 16) / (3 / 4)))
+								*
+									Matrix.translation(ToMiddle)
+							  )
+						  )
+						OldRender = cairo.SurfacePattern(RGBPix)
+						OldRender.set_filter(cairo.FILTER_NEAREST)
+						  # ensure I don't add any new colours
+						NewRender.set_source(OldRender)
+						NewRender.paint()
+						NewRenderPix.flush()
+						OldRender = None # free up memory
+						RGBPixels = NewRenderPixels
+						RGBPix = NewRenderPix
+						RGBRender = NewRender
+					else :
+						MenuBounds = (0, 0) + ImageBounds
+					#end if
+					RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
+					for \
+						Colors, Suffix \
+					in \
 						(
-							0,
-							HeightMid - HalfHeight,
-							ImageBounds[0],
-							2 * HalfHeight
-						)
-				else :
-					MenuBounds = (0, 0) + ImageBounds
-				#end if
-				subpictures = XMLElementTree.Element("subpictures")
-				stream = XMLElementTree.SubElement(subpictures, "stream")
-				spu = XMLElementTree.SubElement \
-				  (
-					parent = stream,
-					tag = "spu",
-					attrib =
-						{
-							"force" : "yes",
-							# "transparent"?
-							"start" : "00:00:00.0",
-							"end" : "00:00:00.0",
-							"image" : os.path.basename(ImageNormalName),
-							"highlight" : os.path.basename(ImageHighlightedName),
-							"select" : os.path.basename(ImageSelectedName),
-						}
-				  )
-				for Button in iter(MainWindow.ButtonList) :
-					ButtonSpec = Button[1]
-					Bounds = MapButtonRect \
-					  (
-						ButtonBounds = ButtonSpec["bounds"],
-						SrcBounds = (0, 0) + LoadedImage.SrcDimensions,
-						DstBounds = MenuBounds
-					  )
-					ButtonAttrs = \
-						{
-							"name" : Button[0],
-							"x0" : str(int(Bounds[0])),
-							"y0" : str(int(Bounds[1]) & ~1),
-							"x1" : str(int(Bounds[0] + Bounds[2])),
-							"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
-						}
-					for Neighbour in ("up", "down", "left", "right") :
-						if ButtonSpec.has_key(Neighbour) :
-							ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # TBD check it exists?
-						#end if
+							(MainWindow.ColorsNormalList, "normal"),
+							(MainWindow.ColorsHighlightedList, "highlighted"),
+							(MainWindow.ColorsSelectedList, "selected"),
+						) \
+					:
+						ImageName = ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]]
+						Colors = tuple(Color[0] for Color in Colors)
+						IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
+						OutFile = open(ImageName, "w")
+						spuhelper.write_png \
+						  (
+							IndexedImage, # pixels array
+							ImageBounds[0], # width
+							Colors,
+							OutFile
+						  )
+						OutFile.flush()
+						OutFile.close()
 					#end for
-					ButtonTag = XMLElementTree.SubElement \
+					subpictures = XMLElementTree.Element("subpictures")
+					stream = XMLElementTree.SubElement(subpictures, "stream")
+					spu = XMLElementTree.SubElement \
 					  (
-						parent = spu,
-						tag = ("button", "action")[ButtonSpec.get("auto", False)],
-						attrib = ButtonAttrs
+						parent = stream,
+						tag = "spu",
+						attrib =
+							{
+								"force" : "yes",
+								# "transparent"?
+								"start" : "00:00:00.0",
+								"end" : "00:00:00.0",
+								"image" : os.path.basename(ImageNames["normal"]),
+								"highlight" : os.path.basename(ImageNames["highlighted"]),
+								"select" : os.path.basename(ImageNames["selected"]),
+							}
 					  )
-				#end for
-				OutFile = open((MenuFileName, LetterboxedMenuFileName)[Letterboxed], "w")
-				XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
-				OutFile.flush()
-				OutFile.close()
+					for Button in iter(MainWindow.ButtonList) :
+						ButtonSpec = Button[1]
+						Bounds = MapButtonRect \
+						  (
+							ButtonBounds = ButtonSpec["bounds"],
+							SrcBounds = (0, 0) + LoadedImage.SrcDimensions,
+							DstBounds = MenuBounds
+						  )
+						ButtonAttrs = \
+							{
+								"name" : Button[0],
+								"x0" : str(int(Bounds[0])),
+								"y0" : str(int(Bounds[1]) & ~1),
+								"x1" : str(int(Bounds[0] + Bounds[2])),
+								"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
+							}
+						for Neighbour in ("up", "down", "left", "right") :
+							if ButtonSpec.has_key(Neighbour) :
+								ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # fixme check it exists?
+							#end if
+						#end for
+						ButtonTag = XMLElementTree.SubElement \
+						  (
+							parent = spu,
+							tag = ("button", "action")[ButtonSpec.get("auto", False)],
+							attrib = ButtonAttrs
+						  )
+					#end for
+					OutFile = open(MenuFileNames[Letterboxed], "w")
+					XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
+					OutFile.flush()
+					OutFile.close()
+				#end if GenerateMenu[Letterboxed]
 				if Letterboxed or not LoadedImage.Widescreen :
 					break
 				Letterboxed = True
@@ -1566,7 +1810,7 @@ def SetupMainWindow() :
 	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
 	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
 	NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
-	NewMenuItem(FileMenu, "Load Saved Colours...", MenuAccelGroup, "R", SelectLoadSavedColors)
+	NewMenuItem(FileMenu, "Reload Saved Colours...", MenuAccelGroup, "R", SelectLoadSavedColors)
 	NewMenuSeparatorItem(FileMenu)
 	NewMenuItem(FileMenu, "Save Menu...", MenuAccelGroup, "S", SelectSaveMenu)
 	NewMenuSeparatorItem(FileMenu)
@@ -1636,7 +1880,7 @@ def SetupMainWindow() :
 		ColAttribute = "text",
 		Heading = "Buttons",
 		Bounds = NameListBounds,
-		OnSelectionChanged = None, # TBD perhaps sync list selection to live button selection
+		OnSelectionChanged = None, # fixme perhaps sync list selection to live button selection
 		AddToBox = List1Box
 	  )
 	MainWindow.LayerDisplay = DefineScrollingList \
