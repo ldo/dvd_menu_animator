@@ -151,10 +151,12 @@ static void GetBufferInfo
 		if (TheBufferInfo == 0)
 			break;
 		AddrObj = PyTuple_GetItem(TheBufferInfo, 0);
-		LenObj = PyTuple_GetItem(TheBufferInfo, 1);
 		if (PyErr_Occurred())
 			break;
 		Py_INCREF(AddrObj);
+		LenObj = PyTuple_GetItem(TheBufferInfo, 1);
+		if (PyErr_Occurred())
+			break;
 		Py_INCREF(LenObj);
 		*addr = PyInt_AsUnsignedLongMask(AddrObj);
 		*len = PyInt_AsUnsignedLongMask(LenObj);
