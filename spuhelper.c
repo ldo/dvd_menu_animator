@@ -24,6 +24,7 @@
 #include <Python.h>
 #include <stdbool.h>
 #include <stdint.h>
+#define PNG_SKIP_SETJMP_CHECK
 #include <png.h>
 
 /*
