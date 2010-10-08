@@ -1693,7 +1693,6 @@ def SelectSaveMenu(TheWindow) :
 					else :
 						MenuBounds = (0, 0) + ImageBounds
 					#end if
-					RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
 					for \
 						Colors, Suffix \
 					in \
@@ -1703,6 +1702,8 @@ def SelectSaveMenu(TheWindow) :
 							(MainWindow.ColorsSelectedList, "selected"),
 						) \
 					:
+						sys.stderr.write("Write %s\n" % (ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png")) # debug
+						RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
 						ImageName = ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]]
 						Colors = tuple(Color[0] for Color in Colors)
 						IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
