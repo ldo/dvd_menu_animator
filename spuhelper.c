@@ -126,7 +126,7 @@ static void sort_hist_by_count
 				swaptemp = histogram[i];
 				histogram[i] = histogram[l];
 				histogram[l] = swaptemp;
-				if (i <= m)
+				if (i < m)
 					break;
 				i -= m;
 			  } /*for*/
