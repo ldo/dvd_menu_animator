@@ -54,7 +54,7 @@ a
 <DIV CLASS="h2"><A NAME="Introduction"></A>Introduction</DIV>
 <P>DVD Menu Animator is a tool to aid in the design of
 <A HREF="http://wlug.org.nz/DVDVideo">DVD-Video</A> menus. It is meant to be used in
-conjunction with <A HREF="http://wlug.org.nz/dvdauthor">dvdauthor</A> and
+conjunction with <A HREF="http://dvdauthor.sourceforge.net">DVDAuthor</A> and
 <A HREF="http://www.inkscape.org/">Inkscape</A>: you use Inkscape to do the main design of the
 menu appearance and button placement; choose additional highlight and selection colours
 in DVD Menu Animator; then put the results through the <TT>spumux</TT> tool (part of
@@ -105,15 +105,19 @@ Object menu. In the resulting dialog, enter the button name in the id field (the
 and Title are ignored):
 <P STYLE="text-align : center"><IMG SRC="object_properties.png"></P>
 <P>You can also define here which neighbouring buttons the user will go to from this one
-if they use the arrows on their remote. This information goes in the Description field,
-where you can specify any or all of the following, one to a line, in any order:
+if they use the arrows on their remote, and also whether the button is an “auto-action”
+button (which takes effect as soon as it is highlighted by the user). This information goes
+in the Description field, where you can specify any or all of the following, one to a line,
+in any order:
 <UL>
 <LI><TT>up=</TT><I>button_name</I>
 <LI><TT>down=</TT><I>button_name</I>
 <LI><TT>left=</TT><I>button_name</I>
 <LI><TT>right=</TT><I>button_name</I>
+<LI><TT>action=auto</TT>
 </UL>
-<P>Note these settings are case-sensitive, and spaces are not allowed.
+<P>Note these settings are case-sensitive, and spaces are not allowed. Note also that
+auto-action buttons are only properly supported in post-0.6.14 versions of DVDAuthor.
 <P><B>Don’t forget to click the “Set” button before closing this dialog</B>.
 <P>Once you’ve finished the above steps, save your Inkscape drawing and start up
 DVD Menu Animator.
