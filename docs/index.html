@@ -32,7 +32,7 @@ a
 
 <DIV CLASS="h1">DVD Menu Animator User Guide<BR>
 <A HREF="mailto:&quot;Lawrence D'Oliveiro&quot; &lt;ldo@geek-central.gen.nz&gt;">Lawrence D&#8217;Oliveiro</A><BR>
-2010 February 8</DIV>
+2010 October 10</DIV>
 <DIV STYLE="position : fixed; height : auto; width : 20%; top : 1em; right : 1em; left : auto; background-color : #E8E8E0">Table of Contents
 <OL>
 <LI><A HREF="#Introduction">Introduction</A>
@@ -43,7 +43,7 @@ a
 <LI><A HREF="#Overscan">Allowing for Overscan</A>
 <LI><A HREF="#Animating">Animating Your Menu</A>
 <LI><A HREF="#Transparency">Using Transparency</A>
-<LI><A HREF="#Saving">Saving Your Menu</A>
+<LI><A HREF="#Widescreen">Widescreen Considerations</A>
 </UL>
 <LI><A HREF="#FAQ">Frequently-Asked Questions</A>
 </OL>
@@ -209,6 +209,22 @@ generated at the same time.</P>
 <P>And here you also choose what video format (NTSC or PAL) your DVD-Video disc will be
 using, so it knows what pixel dimensions the final menu images should have (720x480 for NTSC,
 720x576 for PAL).</P>
+
+<DIV CLASS="h3"><A NAME="Widescreen"></A>Widescreen Considerations</DIV>
+<P>When widescreen video is being played back on a narrowscreen TV, the user can
+configure their player to display it in either <I>letterboxed</I> or <I>pan-and-scan</I> mode.
+<P>A peculiarity of the DVD-Video spec is that, in either case, subtitles and menus
+<I>always fill the screen</I>. In other words, if you design a widescreen menu or subtitle to go
+with widescreen video, and the video is being letterboxed on a 4:3 screen, the menu or subtitle
+will <I>not</I> automatically be so letterboxed.
+<P>Instead, what you have to do is provide alternative versions of the menu in this case:
+the full-screen one for display on a 16:9 screen, and another one which has been vertically
+shrunk so that it will appear in the right proportions on a 4:3 screen.
+<P>DVD Menu Animator has a built-in provision to generate these two forms. When saving a
+menu which was designed with 16:9 proportions, you will see two checkboxes appear in
+the file-save dialog: each checkbox lets you save the appropriate version of the menu XML
+file, accompanied by its own set of image file names. The names for the letterboxed files
+are automatically generated from the full-screen versions by including “<TT>-letterboxed</TT>”.
 
 <DIV CLASS="h2"><A NAME="FAQ"></A>Frequently-Asked Questions</DIV>
 <P><B>Q: Text is displaying as solid black rectangles.</B></P>
