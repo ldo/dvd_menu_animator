@@ -794,6 +794,8 @@ def LoadMenuImage(FileName) :
 			NewContents = XMLElementTree.parse(FileName)
 		except ExpatError :
 			raise Failure("Not a valid SVG file.")
+		except IOError, Why :
+			raise Failure(str(Why))
 		#end try
 		NewLayers = {}
 		NewLayerList = []
@@ -881,6 +883,138 @@ def LoadBackgroundImage(FileName) :
 		ErrorAlert(Reason.Msg)
 	#end try
 #end LoadBackgroundImage
+
+def LoadColors(PaletteFileName) :
+	"""loads a palette file of colours to choose from."""
+	try :
+		try :
+			PaletteFile = open(PaletteFileName, "r")
+		except IOError, Why :
+			raise Failure(str(Why))
+		#end try
+		if PaletteFile.readline().strip() != "GIMP Palette" :
+			raise Failure("doesn't look like a GIMP palette file")
+		#end if
+		Name = "Untitled"
+		while True :
+			line = PaletteFile.readline()
+			if len(line) == 0 :
+				raise Failure("palette file seems to be empty")
+			#end if
+			line = line.rstrip("\n")
+			if line.startswith("Name: ") :
+				Name = line[6:].strip()
+			#end if
+			if line.startswith("#") :
+				break
+		#end while
+		Colors = []
+		while True :
+			line = PaletteFile.readline()
+			if len(line) == 0 :
+				break
+			if not line.startswith("#") :
+				line = line.rstrip("\n")
+				components = line.split("\t", 1)
+				if len(components) == 1 :
+					components.append("") # empty name
+				#end if
+				try :
+					color = tuple(int(i.strip()) for i in components[0].split(None, 2))
+				except ValueError :
+					raise Failure("bad colour on line %s" % repr(line))
+				#end try
+				Colors.append((color, components[1]))
+			#end if
+		#end while
+	  # all successfully loaded
+		MainWindow.LoadedColorsList.clear()
+		for color in Colors :
+			MainWindow.LoadedColorsList.append((color[0],)) # fixme display name as well
+		#end for
+		MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
+	except Failure, Reason :
+		ErrorAlert(Reason.Msg)
+	#end try
+#end LoadColors
+
+def LoadSavedColors(MenuFileName) :
+	"""reloads the colour palettes from a previously-saved menu XML file."""
+	try :
+		try :
+			MenuContents = XMLElementTree.parse(MenuFileName)
+		except ExpatError :
+			raise Failure("Not a valid XML file.")
+		#end try
+		FindTag = MenuContents.getroot()
+		if FindTag != None :
+			FindTag = FindTag.find("stream")
+		#end if
+		if FindTag != None :
+			FindTag = FindTag.find("spu")
+		#end if
+		if FindTag == None :
+			raise Failure("can't make sense of contents of menu XML file")
+		#end if
+		Succeeded = []
+		Failed = []
+		for \
+			Description, Attr, ColorList \
+		in \
+			(
+				("normal", "image", MainWindow.ColorsNormalList),
+				("highlighted", "highlight", MainWindow.ColorsHighlightedList),
+				("selected", "select", MainWindow.ColorsSelectedList),
+			) \
+		:
+			ImageName = FindTag.get(Attr)
+			if ImageName != None :
+				try :
+					if not ImageName.startswith("/") :
+						ImageName = os.path.join(os.path.dirname(MenuFileName), ImageName)
+					#end if
+					try :
+						ImageFile = open(ImageName, "r")
+					except IOError :
+						raise Failure("couldn't open %s" % ImageName)
+					#end try
+					try :
+						Colors = spuhelper.read_png_palette(ImageFile)
+					except RuntimeError :
+						raise Failure("couldn't make sense of %s" % ImageName)
+					#end try
+					if Colors == None :
+						raise Failure("no palette in PNG file %s" % ImageName)
+					#end if
+					sys.stderr.write("Colors for %s = %s\n" % (ImageName, repr(Colors))) # debug
+					for i, Color in enumerate(Colors[:4]) :
+						ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
+					#end for
+					Succeeded.append(Description)
+				except Failure :
+					Failed.append(ImageName)
+				#end try
+			#end if
+		#end for
+		Msg = \
+			(
+				("", "Successfully loaded: ")[len(Succeeded) != 0]
+			+
+				", ".join(Succeeded)
+			+
+				("", "; ")[len(Succeeded) != 0 and len(Failed) != 0]
+			+
+				("", "Failed to load: ")[len(Failed) != 0]
+			+
+				", ".join(Failed)
+			+
+				("", ".")[len(Succeeded) != 0 or len(Failed) != 0]
+			)
+		MsgAlert(Msg, gtk.MESSAGE_INFO)
+	except Failure, Reason :
+		ErrorAlert(Reason.Msg)
+	#end try
+#end LoadSavedColors
 
 def FindButtons() :
 	"""finds all button definitions in the selected button layer."""
@@ -977,56 +1111,7 @@ def SelectLoadColors(TheWindow) :
 		Filters = (("GIMP Palette Files", ("*.gpl",)),)
 	  )
 	if PaletteFileName != None :
-		try :
-			try :
-				PaletteFile = open(PaletteFileName, "r")
-			except IOError, Why :
-				raise Failure(str(Why))
-			#end try
-			if PaletteFile.readline().strip() != "GIMP Palette" :
-				raise Failure("doesn't look like a GIMP palette file")
-			#end if
-			Name = "Untitled"
-			while True :
-				line = PaletteFile.readline()
-				if len(line) == 0 :
-					raise Failure("palette file seems to be empty")
-				#end if
-				line = line.rstrip("\n")
-				if line.startswith("Name: ") :
-					Name = line[6:].strip()
-				#end if
-				if line.startswith("#") :
-					break
-			#end while
-			Colors = []
-			while True :
-				line = PaletteFile.readline()
-				if len(line) == 0 :
-					break
-				if not line.startswith("#") :
-					line = line.rstrip("\n")
-					components = line.split("\t", 1)
-					if len(components) == 1 :
-						components.append("") # empty name
-					#end if
-					try :
-						color = tuple(int(i.strip()) for i in components[0].split(None, 2))
-					except ValueError :
-						raise Failure("bad colour on line %s" % repr(line))
-					#end try
-					Colors.append((color, components[1]))
-				#end if
-			#end while
-		  # all successfully loaded
-			MainWindow.LoadedColorsList.clear()
-			for color in Colors :
-				MainWindow.LoadedColorsList.append((color[0],)) # fixme display name as well
-			#end for
-			MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
-		except Failure, Reason :
-			ErrorAlert(Reason.Msg)
-		#end try
+		LoadColors(PaletteFileName)
 	#end if
 #end SelectLoadColors
 
@@ -1039,80 +1124,7 @@ def SelectLoadSavedColors(TheWindow) :
 		Filters = (("XML Files", ("*.xml",)),)
 	  )
 	if MenuFileName != None :
-		try :
-			try :
-				MenuContents = XMLElementTree.parse(MenuFileName)
-			except ExpatError :
-				raise Failure("Not a valid XML file.")
-			#end try
-			FindTag = MenuContents.getroot()
-			if FindTag != None :
-				FindTag = FindTag.find("stream")
-			#end if
-			if FindTag != None :
-				FindTag = FindTag.find("spu")
-			#end if
-			if FindTag == None :
-				raise Failure("can't make sense of contents of menu XML file")
-			#end if
-			Succeeded = []
-			Failed = []
-			for \
-				Description, Attr, ColorList \
-			in \
-				(
-					("normal", "image", MainWindow.ColorsNormalList),
-					("highlighted", "highlight", MainWindow.ColorsHighlightedList),
-					("selected", "select", MainWindow.ColorsSelectedList),
-				) \
-			:
-				ImageName = FindTag.get(Attr)
-				if ImageName != None :
-					try :
-						if not ImageName.startswith("/") :
-							ImageName = os.path.join(os.path.dirname(MenuFileName), ImageName)
-						#end if
-						try :
-							ImageFile = open(ImageName, "r")
-						except IOError :
-							raise Failure("couldn't open %s" % ImageName)
-						#end try
-						try :
-							Colors = spuhelper.read_png_palette(ImageFile)
-						except RuntimeError :
-							raise Failure("couldn't make sense of %s" % ImageName)
-						#end try
-						if Colors == None :
-							raise Failure("no palette in PNG file %s" % ImageName)
-						#end if
-						sys.stderr.write("Colors for %s = %s\n" % (ImageName, repr(Colors))) # debug
-						for i, Color in enumerate(Colors[:4]) :
-							ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
-						#end for
-						Succeeded.append(Description)
-					except Failure :
-						Failed.append(ImageName)
-					#end try
-				#end if
-			#end for
-			Msg = \
-				(
-					("", "Successfully loaded: ")[len(Succeeded) != 0]
-				+
-					", ".join(Succeeded)
-				+
-					("", "; ")[len(Succeeded) != 0 and len(Failed) != 0]
-				+
-					("", "Failed to load: ")[len(Failed) != 0]
-				+
-					", ".join(Failed)
-				+
-					("", ".")[len(Succeeded) != 0 or len(Failed) != 0]
-				)
-			MsgAlert(Msg, gtk.MESSAGE_INFO)
-		except Failure, Reason :
-			ErrorAlert(Reason.Msg)
-		#end try
+		LoadSavedColors(MenuFileName)
 	#end if
 #end SelectLoadSavedColors
 
@@ -1782,7 +1794,7 @@ def AboutMe(TheWindow) :
 	# displays a dialog showing information about the program.
 	About = gtk.AboutDialog()
 	About.set_name("DVD Menu Animator")
-	About.set_version("0.02")
+	About.set_version("0.03")
 	About.set_comments("A utility to ease the construction of DVD-Video menus")
 	About.set_copyright("© 2010 Lawrence D'Oliveiro")
 	# About.set_license("GPLv3+")
@@ -1977,8 +1989,34 @@ def SetupMainWindow() :
 	MainWindow.Window.show_all()
 #end SetupMainWindow
 
+def ParseCommandLine() :
+	"""parses command-line options for preloading menu image and other files."""
+	(Opts, Args) = getopt.getopt \
+	  (
+		sys.argv[1:],
+		"",
+		["background=", "palette=", "saved="]
+	  )
+	if len(Args) > 1 :
+		raise getopt.GetoptError("expecting no more than one arg, the menu image filename to load")
+	#end if
+	if len(Args) > 0 :
+		LoadMenuImage(Args[0])
+	#end if
+	for Keyword, Value in Opts :
+		if Keyword == "--background" :
+			LoadBackgroundImage(Value)
+		elif Keyword == "--palette" :
+			LoadColors(Value)
+		elif Keyword == "--saved" :
+			LoadSavedColors(Value)
+		#end if
+	#end for
+#end ParseCommandLine
+
 SetupMainWindow()
 LoadedImage.Contents = None # to begin with
 LoadedImage.Background = None # ditto
+ParseCommandLine()
 MainWindow.Window.show()
 gtk.main()
