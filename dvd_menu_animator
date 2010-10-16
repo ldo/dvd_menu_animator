@@ -567,8 +567,6 @@ def RenderImagePix() :
 	  )
 	Offscreen = cairo.Context(OffscreenPix)
 	Offscreen.identity_matrix()
-	# Offscreen.set_source_rgba(1, 1, 1, 1)
-	# Offscreen.paint()
 	ScaleFactor = min \
 	  (
 		LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
@@ -644,7 +642,6 @@ def AnalyzeImage() :
 		MainWindow.Loading = False
 	#end if
 	UseColors = LoadedImage.Colors
-	sys.stderr.write("Found colors %s\n" % repr(UseColors[:4])) # debug
 	for \
 		ColorList \
 	in \
@@ -757,7 +754,6 @@ def DisplayImage() :
 				LoadedImage.RowStride # stride
 			  )
 		  )
-		Composite.set_operator(cairo.OPERATOR_OVER) # debug
 		Composite.paint()
 		if HighlightPixels != None :
 			Composite.set_source_surface \
@@ -989,7 +985,6 @@ def LoadSavedColors(MenuFileName) :
 					if Colors == None :
 						raise Failure("no palette in PNG file %s" % ImageName)
 					#end if
-					sys.stderr.write("Colors for %s = %s\n" % (ImageName, repr(Colors))) # debug
 					for i, Color in enumerate(Colors[:4]) :
 						ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
 					#end for
@@ -1718,8 +1713,7 @@ def SelectSaveMenu(TheWindow) :
 							(MainWindow.ColorsSelectedList, "selected"),
 						) \
 					:
-						sys.stderr.write("Write %s\n" % (ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png")) # debug
-						RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
+						# RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
 						ImageName = ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]]
 						Colors = tuple(Color[0] for Color in Colors)
 						IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
