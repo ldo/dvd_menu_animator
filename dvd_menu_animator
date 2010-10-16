@@ -553,7 +553,7 @@ def RenderImagePix() :
 	Pixels = array.array \
 	  (
 		"B",
-			(255, 255, 255, 255)
+			(0, 0, 0, 0) # for correct treatment of non-opaque image pixels
 		*
 			(LoadedImage.RowStride // 4 * LoadedImage.ImageDrawSize[1])
 	  )
@@ -567,8 +567,8 @@ def RenderImagePix() :
 	  )
 	Offscreen = cairo.Context(OffscreenPix)
 	Offscreen.identity_matrix()
-	Offscreen.set_source_rgba(1, 1, 1, 1)
-	Offscreen.paint()
+	# Offscreen.set_source_rgba(1, 1, 1, 1)
+	# Offscreen.paint()
 	ScaleFactor = min \
 	  (
 		LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
@@ -644,6 +644,7 @@ def AnalyzeImage() :
 		MainWindow.Loading = False
 	#end if
 	UseColors = LoadedImage.Colors
+	sys.stderr.write("Found colors %s\n" % repr(UseColors[:4])) # debug
 	for \
 		ColorList \
 	in \
@@ -719,6 +720,7 @@ def DisplayImage() :
 		  (
 			"B", # not "I" because then tostring puts the bytes in the wrong order
 			(255, 255, 255, 255) * LoadedImage.ImageDrawSize[1] * (LoadedImage.RowStride // 4)
+			  # initial colour doesn't matter, will be replaced by CheckPattern
 		  )
 		CompositeSurface = cairo.ImageSurface.create_for_data \
 		  (
@@ -755,6 +757,7 @@ def DisplayImage() :
 				LoadedImage.RowStride # stride
 			  )
 		  )
+		Composite.set_operator(cairo.OPERATOR_OVER) # debug
 		Composite.paint()
 		if HighlightPixels != None :
 			Composite.set_source_surface \
@@ -1146,7 +1149,6 @@ def ColorDisplayChanged(TheButton, Index) :
 
 def EditColor(TreeView, ColorPath, ViewColumn) :
 	# called when an item in a colour list is double-clicked.
-	# fixme: should I be premultiplying alpha? libpng might not be expecting that.
 	ForgetButtonBlink()
 	if ColorPath[0] < 4 : # excess colours won't be saved anyway
 		ColorList = TreeView.get_model()
@@ -1615,25 +1617,25 @@ def SelectSaveMenu(TheWindow) :
 			ImageRefHeight = ImageBounds[0] / ReferenceScale[0] * ReferenceScale[1]
 			  # image height if pixels were square
 			ImageRowStride = ImageBounds[0] * 4 # fixme: use format_stride_for_width
-			RGBPixels = array.array \
-			  (
-				"B",
-					FillColor
-				*
-					(ImageRowStride // 4 * ImageBounds[1])
-			  )
-			RGBPix = cairo.ImageSurface.create_for_data \
-			  (
-				RGBPixels, # data
-				cairo.FORMAT_ARGB32, # format
-				ImageBounds[0], # width
-				ImageBounds[1], # height
-				ImageRowStride # stride
-			  )
-			RGBRender = cairo.Context(RGBPix)
 			Letterboxed = False # which version of menu I'm generating
 			while True : # write menu XML file(s) and associated image files
 				if GenerateMenu[Letterboxed] :
+					RGBPixels = array.array \
+					  (
+						"B",
+							(0, 0, 0, 0) # for correct treatment of non-opaque image pixels
+						*
+							(ImageRowStride // 4 * ImageBounds[1])
+					  )
+					RGBPix = cairo.ImageSurface.create_for_data \
+					  (
+						RGBPixels, # data
+						cairo.FORMAT_ARGB32, # format
+						ImageBounds[0], # width
+						ImageBounds[1], # height
+						ImageRowStride # stride
+					  )
+					RGBRender = cairo.Context(RGBPix)
 					FitFactor = min \
 					  (
 						ImageBounds[0] / LoadedImage.SrcDimensions[0],
@@ -1681,6 +1683,8 @@ def SelectSaveMenu(TheWindow) :
 							ImageRowStride # stride
 						  )
 						NewRender = cairo.Context(NewRenderPix)
+						NewRender.set_operator(cairo.OPERATOR_SOURCE)
+						  # ensure correct treatment of non-opaque pixels
 						NewRender.set_matrix \
 						  (
 							ToCairo

@@ -794,6 +794,7 @@ static PyObject * spuhelper_gtk_to_cairo_a
 						break;
 					NrBufPixels = 0;
 				  } /*if*/
+			  /* fixme: Cairo wants premultipled alpha, GDK doesn't */
 				R = *SrcPixels++;
 				G = *SrcPixels++;
 				B = *SrcPixels++;
@@ -849,6 +850,7 @@ static PyObject * spuhelper_cairo_to_gtk
 		while (pixlen > 0)
 		  {
 			const uint32_t thispixel = *(const uint32_t *)pixels;
+		  /* fixme: Cairo wants premultiplied alpha, GDK doesn't */
 			*pixels++ = thispixel >> 16 & 255; /* R */
 			*pixels++ = thispixel >> 8 & 255; /* G */
 			*pixels++ = thispixel & 255; /* B */
@@ -962,10 +964,20 @@ static PyObject * spuhelper_write_png
 			unsigned int i;
 			for (i = 0; i < 4; ++i)
 			  {
-				pngcolors[i].red = colors[i] >> 16 & 255;
-				pngcolors[i].green = colors[i] >> 8 & 255;
-				pngcolors[i].blue = colors[i] & 255;
 				alpha[i] = colors[i] >> 24 & 255;
+				if (alpha[i] != 0)
+				  {
+				  /* PNG doesn't want premultiplied alpha */
+					pngcolors[i].red = (colors[i] >> 16 & 255) * 255 / alpha[i];
+					pngcolors[i].green = (colors[i] >> 8 & 255) * 255 / alpha[i];
+					pngcolors[i].blue = (colors[i] & 255) * 255 / alpha[i];
+				  }
+				else
+				  {
+					pngcolors[i].red = 0;
+					pngcolors[i].green = 0;
+					pngcolors[i].blue = 0;
+				  } /*if*/
 			  } /*for*/
 			png_set_PLTE
 			  (
@@ -1173,9 +1185,25 @@ static PyObject * spuhelper_read_png_palette
 			ColorTuple = PyTuple_New(4);
 			if (ColorTuple == 0)
 				break;
-			PyTuple_SET_ITEM(ColorTuple, 0, PyInt_FromLong(pngcolors[i].red)); /* R */
-			PyTuple_SET_ITEM(ColorTuple, 1, PyInt_FromLong(pngcolors[i].green)); /* G */
-			PyTuple_SET_ITEM(ColorTuple, 2, PyInt_FromLong(pngcolors[i].blue)); /* B */
+		  /* convert colours to premultiplied alpha */
+			PyTuple_SET_ITEM
+			  (
+				ColorTuple,
+				0,
+				PyInt_FromLong(pngcolors[i].red * (i < nrtransparent ? 255 : alpha[i]) / 255)
+			  ); /* R */
+			PyTuple_SET_ITEM
+			  (
+				ColorTuple,
+				1,
+				PyInt_FromLong(pngcolors[i].green * (i < nrtransparent ? 255 : alpha[i]) / 255)
+			  ); /* G */
+			PyTuple_SET_ITEM
+			  (
+				ColorTuple,
+				2,
+				PyInt_FromLong(pngcolors[i].blue * (i < nrtransparent ? 255 : alpha[i]) / 255)
+			  ); /* B */
 			PyTuple_SET_ITEM(ColorTuple, 3, PyInt_FromLong(i < nrtransparent ? alpha[i] : 255)); /* A */
 			if (PyErr_Occurred())
 				break;
