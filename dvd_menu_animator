@@ -404,11 +404,6 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 		Draw = gtk.gdk.GC(DrawWhere)
 		ColorMap = Draw.get_colormap()
 		Draw.set_function(gtk.gdk.COPY)
-		if len(self.color) > 3 :
-			Opacity = self.color[3]
-		else :
-			Opacity = 1.0
-		#end if
 		Draw.set_foreground \
 		  (
 			ColorMap.alloc_color
@@ -417,7 +412,7 @@ class ColorCellRenderer(gtk.GenericCellRenderer) :
 				  (
 					*tuple
 					  (
-						int(round(((c - 0.5) * Opacity + 0.5) * 65535))
+						int(round(c * 65535)) # premultiplied alpha will give darkening effect
 						for c in self.color[:3]
 					  )
 				  )
