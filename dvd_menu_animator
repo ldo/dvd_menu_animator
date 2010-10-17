@@ -1327,6 +1327,7 @@ def SelectSaveMenu(TheWindow) :
 	TheDialog = None
 	NormalLabelStyle = None
 	DimmedLabelStyle = None
+	NameLabels = {}
 	ExtraFileNames = {}
 	SelectedAspects = [None, None]
 	GenerateMenu = [True, True] # whether to generate narrowscreen and widescreen versions of menu
@@ -1340,12 +1341,14 @@ def SelectSaveMenu(TheWindow) :
 			Suffix \
 		in \
 			(
-				((), ("letterbox",))[ExtraFileNames.has_key("letterbox")]
+				((), ("letterbox",))[ExtraFileNames.has_key("letterbox") and Which]
 			+
 				tuple(s + ("", "-letterboxed")[Which] for s in ("normal", "highlighted", "selected"))
 			) \
 		:
-			ExtraFileNames[Suffix].modify_style((DimmedLabelStyle, NormalLabelStyle)[GenerateMenu[Which]])
+			for NameLabel in (ExtraFileNames[Suffix], NameLabels[Suffix]) :
+				NameLabel.modify_style((DimmedLabelStyle, NormalLabelStyle)[GenerateMenu[Which]])
+			#end for
 		#end for
 	#end SelectedAspectToggled
 
@@ -1476,11 +1479,11 @@ def SelectSaveMenu(TheWindow) :
 				  ) \
 		:
 			if Suffix != None :
-				NameLabel = gtk.Label(ExtraNamesPrompts[Suffix])
-				NameLabel.set_alignment(0, 0.5)
+				NameLabels[Suffix] = gtk.Label(ExtraNamesPrompts[Suffix])
+				NameLabels[Suffix].set_alignment(0, 0.5)
 				ExtraBox.attach \
 				  (
-					NameLabel,
+					NameLabels[Suffix],
 					0, 1, Row, Row + 1
 				  )
 				ExtraFileNames[Suffix] = gtk.Label()
