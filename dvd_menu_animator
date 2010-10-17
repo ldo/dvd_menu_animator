@@ -1675,6 +1675,16 @@ def SelectSaveMenu(TheWindow) :
 						NewRender = cairo.Context(NewRenderPix)
 						NewRender.set_operator(cairo.OPERATOR_SOURCE)
 						  # ensure correct treatment of non-opaque pixels
+						NewRender.rectangle \
+						  (
+							0, # x
+							ImageBounds[1] / 2 - HalfHeight + 1, # y
+							ImageBounds[0], # width
+							2 * HalfHeight - 2 # height
+						  )
+						  # be sure not to pick up any transparent areas outside
+						  # menu image, fudge height a bit to truncate partial
+						  # pixels just in case
 						NewRender.set_matrix \
 						  (
 							ToCairo
@@ -1690,7 +1700,7 @@ def SelectSaveMenu(TheWindow) :
 						OldRender.set_filter(cairo.FILTER_NEAREST)
 						  # ensure I don't add any new colours
 						NewRender.set_source(OldRender)
-						NewRender.paint()
+						NewRender.fill()
 						NewRenderPix.flush()
 						OldRender = None # free up memory
 						RGBPixels = NewRenderPixels
