@@ -66,7 +66,7 @@ in DVD Menu Animator; then put the results through the <TT>spumux</TT> tool (par
 called <TT>spuhelper</TT>, which needs to be compiled, and an “Overscan Margins”
 plug-in for Inkscape. To build and install everything, just do this as superuser in the
 directory containing the source files:
-<BLOCKQUOTE>python setup.py install</BLOCKQUOTE>
+<BLOCKQUOTE><TT>python setup.py install</TT></BLOCKQUOTE>
 
 <DIV CLASS="h2"><A NAME="Usage"></A>Usage</DIV>
 <DIV CLASS="h3"><A NAME="UsingInkscape"></A>Making a Menu in Inkscape</DIV>
@@ -261,6 +261,16 @@ Is there a way to avoid re-specifying all the highlight and selection colours ag
 “Reload Saved Colours...” from the File menu, and choose the menu XML file that you previously
 saved. DVD Menu Animator will use this to find the associated
 PNG files, and reload their colour tables into the appropriate lists.
+
+<P><B>Q: Inkscape provides templates for creating drawings with dimensions of 720x480 pixels
+for NTSC, and 720x576 pixels for PAL, but they don’t work with DVD Menu Animator.</B></P>
+
+<P><B>A: </B>Don’t waste your time with those templates. They use distorted dimensions
+which mean that round circles won’t look round on your PC screen. Or conversely, if you
+draw round circles on your PC screen, they won’t display as round on your TV screen. Just
+create a drawing from scratch, using any dimensions you like, but in the 4:3 or 16:9
+aspect ratio as per the the instructions above, and DVD Menu Animator will take care of
+applying the necessary compensating distortions when saving the final menu images.</P>
 
 </DIV>
 </BODY>
