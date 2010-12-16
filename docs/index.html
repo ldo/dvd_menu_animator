@@ -66,7 +66,7 @@ in DVD Menu Animator; then put the results through the <TT>spumux</TT> tool (par
 called <TT>spuhelper</TT>, which needs to be compiled, and an “Overscan Margins”
 plug-in for Inkscape. To build and install everything, just do this as superuser in the
 directory containing the source files:
-<BLOCKQUOTE><TT>python setup.py install</TT></BLOCKQUOTE>
+<BLOCKQUOTE><P><TT>python setup.py install</TT></P></BLOCKQUOTE>
 
 <DIV CLASS="h2"><A NAME="Usage"></A>Usage</DIV>
 <DIV CLASS="h3"><A NAME="UsingInkscape"></A>Making a Menu in Inkscape</DIV>
@@ -103,7 +103,7 @@ anything else you put on it will be ignored.</P>
 To do this, click the button rectangle and select “Object Properties...”  from Inkscape’s
 Object menu. In the resulting dialog, enter the button name in the id field (the Label
 and Title are ignored):
-<P STYLE="text-align : center"><IMG SRC="object_properties.png"></P>
+<P STYLE="text-align : center"><IMG SRC="object_properties.png" ALT="object properties dialog"></P>
 <P>You can also define here which neighbouring buttons the user will go to from this one
 if they use the arrows on their remote, and also whether the button is an “auto-action”
 button (which takes effect as soon as it is highlighted by the user). This information goes
@@ -130,7 +130,7 @@ needs to be shot with this in mind, and so does the design of your menus.
 <P>To help you keep your design from encroaching into the unsafe area, use the included
 Overscan Margins plugin. In the current (0.4<I>x</I>) versions of Inkscape, you will
 find this under the “Extensions” menu, in the “Video” submenu:
-<P STYLE="text-align : center"><IMG SRC="overscan_margin.png"></P>
+<P STYLE="text-align : center"><IMG SRC="overscan_margin.png" ALT="Overscan Margins plugin settings"></P>
 <P>Type in numeric percentages of the horizontal and vertical image dimensions,
 and when you click “Apply”, a new layer will be added to the drawing, containing a
 grey fill in the margins of appropriate thickness. Simply ensure no important part
@@ -141,7 +141,7 @@ of your design overlaps any part of the margins.
 <P>In DVD Menu Animator, select “Load Menu Image...” under the File menu to load the
 SVG file you created with Inkscape. If all goes well, you should see it appear on the
 left side of the main DVD Menu Animator window:</P>
-<P STYLE="text-align : center"><IMG SRC="animator.png"></P>
+<P STYLE="text-align : center"><IMG SRC="animator.png" ALT="DVD Menu Animator main window"></P>
 <P>Next to the image is a set of radio buttons title “Using Colours:”. This lets you
 display the menu image in its various states. We will come back to this in a moment.
 <P>To the right of these radio buttons are two lists, titled “Buttons” and “Button Layer”.
@@ -168,8 +168,8 @@ closest-available ones of the most popular 4 in the image (the first 4 entries i
 Before doing so, it does a check that the image “predominantly” consists of just 4 colours
 (where “predominantly” means “at least 95% of the pixels”). If it does not, then you will
 see a message like this at the bottom of the main window:
-<BLOCKQUOTE><SPAN STYLE="color : #FF0000">852 colours is too many, mustn't exceed 4</SPAN>
-</BLOCKQUOTE>
+<BLOCKQUOTE><P><SPAN STYLE="color : #FF0000">852 colours is too many, mustn't exceed 4</SPAN>
+</P></BLOCKQUOTE>
 <P>and you will have to go back to Inkscape to simplify your menu graphic.
 <P>You can double-click the colours in these lists to bring up a chooser dialog that
 lets you change them; or you can drag and drop between entries in different lists, and
@@ -245,9 +245,9 @@ instead of asking me all the time?</B></P>
 (it probably already exists). Within that directory, use your favourite text editor
 to create a file called <TT>video_format</TT>. That file should contain a single line,
 consisting of the word
-<BLOCKQUOTE><TT>NTSC</TT></BLOCKQUOTE>
+<BLOCKQUOTE><P><TT>NTSC</TT></P></BLOCKQUOTE>
 <P>or</P>
-<BLOCKQUOTE><TT>PAL</TT></BLOCKQUOTE>
+<BLOCKQUOTE><P><TT>PAL</TT></P></BLOCKQUOTE>
 <P>When you next launch DVD Menu Animator, it will default to your chosen format.
 <P>More generally, DVD Menu Animator supports all the different ways of specifying this
 setting defined in the
