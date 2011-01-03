@@ -274,7 +274,7 @@ class ns :
 def GetSVGLength(Tag, Attr) :
 	"""parses the attribute Attr of the specified Tag as a number optionally
 	followed by a units string, and returns a tuple of the two parts."""
-	Val = re.search("^(\\d+)([a-z\\%]*)$", Tag.get(Attr)).groups()
+	Val = re.search("^([0-9\.]+)([a-z\\%]*)$", Tag.get(Attr)).groups()
 	return (float(Val[0]), Val[1])
 #end GetSVGLength
 
@@ -802,6 +802,7 @@ def LoadMenuImage(FileName) :
 		NewLayerList = []
 		SVGTag = NewContents.getroot()
 		NewSrcDimensions = (GetSVGLength(SVGTag, "width")[0], GetSVGLength(SVGTag, "height")[0])
+		  # note I don't care what the units are, I'm just assuming they're the same
 		AspectRatio = NewSrcDimensions[0] / NewSrcDimensions[1]
 		AspectTolerance = 0.05 # give user some room to be sloppy
 		if abs(AspectRatio / 4 * 3 - 1) <= AspectTolerance :
