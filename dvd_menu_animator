@@ -1744,7 +1744,14 @@ def SelectSaveMenu(TheWindow) :
 						OutFile.flush()
 						OutFile.close()
 					#end for
-					subpictures = XMLElementTree.Element("subpictures")
+					subpictures = XMLElementTree.Element \
+					  (
+						"subpictures",
+						attrib =
+							{
+								"format" : VideoFormat,
+							}
+					  )
 					stream = XMLElementTree.SubElement(subpictures, "stream")
 					spu = XMLElementTree.SubElement \
 					  (
@@ -1808,9 +1815,9 @@ def AboutMe(TheWindow) :
 	# displays a dialog showing information about the program.
 	About = gtk.AboutDialog()
 	About.set_name("DVD Menu Animator")
-	About.set_version("0.03")
+	About.set_version("0.04")
 	About.set_comments("A utility to ease the construction of DVD-Video menus")
-	About.set_copyright("© 2010 Lawrence D'Oliveiro")
+	About.set_copyright("© 2010, 2011 Lawrence D'Oliveiro")
 	# About.set_license("GPLv3+")
 	# About.set_authors(("Lawrence D'Oliveiro",))
 	About.run()
