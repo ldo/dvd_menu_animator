@@ -1,6 +1,6 @@
 # This Makefile is now used for testing only.
 
-PYTHONVER=python2.5
+PYTHONVER=python2.7
 CFLAGS=-g -I/usr/include/${PYTHONVER} -fPIC -Wall
 
 spuhelper.so : spuhelper.o
