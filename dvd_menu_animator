@@ -28,9 +28,9 @@ import subprocess
 import re
 import array
 from xml.parsers.expat import \
-	ExpatError
+    ExpatError
 from xml.etree import \
-	ElementTree as XMLElementTree
+    ElementTree as XMLElementTree
 import cairo
 import rsvg
 import glib
@@ -45,211 +45,211 @@ import spuhelper
 #-
 
 class Point :
-	"""two-dimensional points."""
-	# subset of the code from Linear2D
+    """two-dimensional points."""
+    # subset of the code from Linear2D
 
-	def __init__(self, h, v) :
-		(self.h, self.v) = (h, v)
-	#end __init__
+    def __init__(self, h, v) :
+        (self.h, self.v) = (h, v)
+    #end __init__
 
-	def __neg__(self) :
-		"""reflect across origin."""
-		return Point \
-		  (
-			h = - self.h,
-			v = - self.v
-		  )
-	#end __neg__
+    def __neg__(self) :
+        """reflect across origin."""
+        return Point \
+          (
+            h = - self.h,
+            v = - self.v
+          )
+    #end __neg__
 
 #end Point
 
 class Matrix :
-	"""a 3x3 matrix representing an arbitrary 2D linear transformation."""
-	# subset of the code from Linear2D
+    """a 3x3 matrix representing an arbitrary 2D linear transformation."""
+    # subset of the code from Linear2D
 
-	def __init__(self, xx, xy, x0, yx, yy, y0, u, v, w) :
-		self.xx = xx
-		self.xy = xy
-		self.x0 = x0
-		self.yx = yx
-		self.yy = yy
-		self.y0 = y0
-		self.u = u
-		self.v = v
-		self.w = w
-	#end __init__
+    def __init__(self, xx, xy, x0, yx, yy, y0, u, v, w) :
+        self.xx = xx
+        self.xy = xy
+        self.x0 = x0
+        self.yx = yx
+        self.yy = yy
+        self.y0 = y0
+        self.u = u
+        self.v = v
+        self.w = w
+    #end __init__
 
-	@staticmethod
-	def identity() :
-		"""returns an identity matrix."""
-		return Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1)
-	#end identity
+    @staticmethod
+    def identity() :
+        """returns an identity matrix."""
+        return Matrix(1, 0, 0, 0, 1, 0, 0, 0, 1)
+    #end identity
 
-	def __mul__(m1, m2) :
-		"""returns concatenation with another matrix."""
-		return Matrix \
-		  (
-			xx = m2.xx * m1.xx + m2.xy * m1.yx + m2.x0 * m1.u,
-			xy = m2.xx * m1.xy + m2.xy * m1.yy + m2.x0 * m1.v,
-			x0 = m2.xx * m1.x0 + m2.xy * m1.y0 + m2.x0 * m1.w,
-			yx = m2.yx * m1.xx + m2.yy * m1.yx + m2.y0 * m1.u,
-			yy = m2.yx * m1.xy + m2.yy * m1.yy + m2.y0 * m1.v,
-			y0 = m2.yx * m1.x0 + m2.yy * m1.y0 + m2.y0 * m1.w,
-			u = m2.u * m1.xx + m2.v * m1.yx + m2.w * m1.u,
-			v = m2.u * m1.xy + m2.v * m1.yy + m2.w * m1.v,
-			w = m2.u * m1.x0 + m2.v * m1.y0 + m2.w * m1.w,
-		  )
-	#end __mul__
+    def __mul__(m1, m2) :
+        """returns concatenation with another matrix."""
+        return Matrix \
+          (
+            xx = m2.xx * m1.xx + m2.xy * m1.yx + m2.x0 * m1.u,
+            xy = m2.xx * m1.xy + m2.xy * m1.yy + m2.x0 * m1.v,
+            x0 = m2.xx * m1.x0 + m2.xy * m1.y0 + m2.x0 * m1.w,
+            yx = m2.yx * m1.xx + m2.yy * m1.yx + m2.y0 * m1.u,
+            yy = m2.yx * m1.xy + m2.yy * m1.yy + m2.y0 * m1.v,
+            y0 = m2.yx * m1.x0 + m2.yy * m1.y0 + m2.y0 * m1.w,
+            u = m2.u * m1.xx + m2.v * m1.yx + m2.w * m1.u,
+            v = m2.u * m1.xy + m2.v * m1.yy + m2.w * m1.v,
+            w = m2.u * m1.x0 + m2.v * m1.y0 + m2.w * m1.w,
+          )
+    #end __mul__
 
-	@staticmethod
-	def translation(delta) :
-		"""returns a matrix that translates by the specified delta Point."""
-		return Matrix(1, 0, delta.h, 0, 1, delta.v, 0, 0, 1)
-	#end translation
+    @staticmethod
+    def translation(delta) :
+        """returns a matrix that translates by the specified delta Point."""
+        return Matrix(1, 0, delta.h, 0, 1, delta.v, 0, 0, 1)
+    #end translation
 
-	@staticmethod
-	def scaling(factor) :
-		"""returns a matrix that scales by the specified Point factors."""
-		return Matrix(factor.h, 0, 0, 0, factor.v, 0, 0, 0, 1)
-	#end scaling
+    @staticmethod
+    def scaling(factor) :
+        """returns a matrix that scales by the specified Point factors."""
+        return Matrix(factor.h, 0, 0, 0, factor.v, 0, 0, 0, 1)
+    #end scaling
 
-	@staticmethod
-	def rotation(Angle) :
-		"""returns a matrix that rotates about the origin by the specified
-		angle in radians."""
-		cos = math.cos(Angle)
-		sin = math.sin(Angle)
-		return Matrix(cos, -sin, 0, sin, cos, 0, 0, 0, 1)
-	#end rotation
+    @staticmethod
+    def rotation(Angle) :
+        """returns a matrix that rotates about the origin by the specified
+        angle in radians."""
+        cos = math.cos(Angle)
+        sin = math.sin(Angle)
+        return Matrix(cos, -sin, 0, sin, cos, 0, 0, 0, 1)
+    #end rotation
 
-	def __repr__(self) :
-		return \
-			(
-				"Matrix(%f, %f, %f, %f, %f, %f, %f, %f, %f)"
-			%
-				(
-					self.xx, self.xy, self.x0,
-					self.yx, self.yy, self.y0,
-					self.u, self.v, self.w,
-				)
-			)
-	#end __repr__
+    def __repr__(self) :
+        return \
+            (
+                "Matrix(%f, %f, %f, %f, %f, %f, %f, %f, %f)"
+            %
+                (
+                    self.xx, self.xy, self.x0,
+                    self.yx, self.yy, self.y0,
+                    self.u, self.v, self.w,
+                )
+            )
+    #end __repr__
 
 #end Matrix
 
 def ToCairo(self) :
-	"""converts TheMatrix to a Cairo Matrix."""
-	return \
-		cairo.Matrix \
-		  (
-			xx = self.xx / self.w,
-			xy = self.xy / self.w,
-			x0 = self.x0 / self.w,
-			yx = self.yx / self.w,
-			yy = self.yy / self.w,
-			y0 = self.y0 / self.w
-		  )
+    """converts TheMatrix to a Cairo Matrix."""
+    return \
+        cairo.Matrix \
+          (
+            xx = self.xx / self.w,
+            xy = self.xy / self.w,
+            x0 = self.x0 / self.w,
+            yx = self.yx / self.w,
+            yy = self.yy / self.w,
+            y0 = self.y0 / self.w
+          )
 #end ToCairo
 
 def RectMatrix(SrcRect, DstRect) :
-	"""returns a Cairo matrix that maps the corners of SrcRect to DstRect."""
-	Result = cairo.Matrix()
-	Result.translate(- SrcRect[0], - SrcRect[1])
-	Result.scale(DstRect[2] / SrcRect[2], DstRect[3] / SrcRect[3])
-	Result.translate(DstRect[0], DstRect[1])
-	return Result
+    """returns a Cairo matrix that maps the corners of SrcRect to DstRect."""
+    Result = cairo.Matrix()
+    Result.translate(- SrcRect[0], - SrcRect[1])
+    Result.scale(DstRect[2] / SrcRect[2], DstRect[3] / SrcRect[3])
+    Result.translate(DstRect[0], DstRect[1])
+    return Result
 #end RectMatrix
 
 def MapButton(Bounds, SrcDimensions, DstDimensions) :
-	"""returns Bounds (l, t, w, h) mapped from SrcDimensions (w, h) to
-	DstDimensions (w, h)."""
-	return \
-		(
-			Bounds[0] * DstDimensions[0] / SrcDimensions[0],
-			Bounds[1] * DstDimensions[1] / SrcDimensions[1],
-			Bounds[2] * DstDimensions[0] / SrcDimensions[0],
-			Bounds[3] * DstDimensions[1] / SrcDimensions[1],
-		)
+    """returns Bounds (l, t, w, h) mapped from SrcDimensions (w, h) to
+    DstDimensions (w, h)."""
+    return \
+        (
+            Bounds[0] * DstDimensions[0] / SrcDimensions[0],
+            Bounds[1] * DstDimensions[1] / SrcDimensions[1],
+            Bounds[2] * DstDimensions[0] / SrcDimensions[0],
+            Bounds[3] * DstDimensions[1] / SrcDimensions[1],
+        )
 #end MapButton
 
 def MapButtonRect(ButtonBounds, SrcBounds, DstBounds) :
-	"""returns ButtonBounds mapped from SrcBounds to DstBounds."""
-	return \
-		(
-			(ButtonBounds[0] - SrcBounds[0]) * DstBounds[2] / SrcBounds[2] + DstBounds[0],
-			(ButtonBounds[1] - SrcBounds[1]) * DstBounds[3] / SrcBounds[3] + DstBounds[1],
-			ButtonBounds[2] * DstBounds[2] / SrcBounds[2],
-			ButtonBounds[3] * DstBounds[3] / SrcBounds[3],
-		)
+    """returns ButtonBounds mapped from SrcBounds to DstBounds."""
+    return \
+        (
+            (ButtonBounds[0] - SrcBounds[0]) * DstBounds[2] / SrcBounds[2] + DstBounds[0],
+            (ButtonBounds[1] - SrcBounds[1]) * DstBounds[3] / SrcBounds[3] + DstBounds[1],
+            ButtonBounds[2] * DstBounds[2] / SrcBounds[2],
+            ButtonBounds[3] * DstBounds[3] / SrcBounds[3],
+        )
 #end MapButtonRect
 
 class xdg_base_dir :
-	"Implementation of relevant parts of the XDG Base Directory specification" \
-	" <http://standards.freedesktop.org/basedir-spec/latest/>."
+    "Implementation of relevant parts of the XDG Base Directory specification" \
+    " <http://standards.freedesktop.org/basedir-spec/latest/>."
 
-	@classmethod
-	def get_config_home(self) :
-		"""returns the directory for holding user-specific config files."""
-		result = os.environ.get("XDG_CONFIG_HOME")
-		if result == None :
-			result = os.path.join(os.environ["HOME"], ".config")
-		#end if
-		return result
-	#end get_config_home
+    @classmethod
+    def get_config_home(self) :
+        """returns the directory for holding user-specific config files."""
+        result = os.environ.get("XDG_CONFIG_HOME")
+        if result == None :
+            result = os.path.join(os.environ["HOME"], ".config")
+        #end if
+        return result
+    #end get_config_home
 
-	@classmethod
-	def config_search_path(self) :
-		"""returns the list of config directories to search (apart from the user area)."""
-		return tuple(os.environ.get("XDG_CONFIG_DIRS", "/etc").split(":"))
-		  # note spec actually says default should be /etc/xdg, but /etc is the
-		  # conventional location for system config files.
-	#end config_search_path
+    @classmethod
+    def config_search_path(self) :
+        """returns the list of config directories to search (apart from the user area)."""
+        return tuple(os.environ.get("XDG_CONFIG_DIRS", "/etc").split(":"))
+          # note spec actually says default should be /etc/xdg, but /etc is the
+          # conventional location for system config files.
+    #end config_search_path
 
-	@classmethod
-	def find_first_config_path(self, path) :
-		"""searches for path in all the config directory locations in order of decreasing
-		priority, returning the expansion where it is first found, or None if not found."""
-		paths_to_try = iter((self.get_config_home(),) + self.config_search_path())
-			# highest priority first
-		while True :
-			try :
-				this_path = paths_to_try.next()
-			except StopIteration :
-				this_path = None
-				break
-			#end try
-			this_path = os.path.join(this_path, path)
-			if os.path.exists(this_path) :
-				break
-		#end while
-		return this_path
-	#end find_first_config_path
+    @classmethod
+    def find_first_config_path(self, path) :
+        """searches for path in all the config directory locations in order of decreasing
+        priority, returning the expansion where it is first found, or None if not found."""
+        paths_to_try = iter((self.get_config_home(),) + self.config_search_path())
+            # highest priority first
+        while True :
+            try :
+                this_path = paths_to_try.next()
+            except StopIteration :
+                this_path = None
+                break
+            #end try
+            this_path = os.path.join(this_path, path)
+            if os.path.exists(this_path) :
+                break
+        #end while
+        return this_path
+    #end find_first_config_path
 
 #end xdg_base_dir
 
 valid_video_formats = frozenset(("NTSC", "PAL"))
 
 def get_default_video_format() :
-	"implements the video-format preference proposal documented at" \
-	" <http://create.freedesktop.org/wiki/Video_Format_Pref>."
-	video_format = os.environ.get("VIDEO_FORMAT")
-	if video_format == None :
-		config_file = xdg_base_dir.find_first_config_path("video_format")
-		if config_file != None :
-			try :
-				video_format = open(config_file, "r").readline().strip()
-			except IOError :
-				video_format = None
-			#end try
-		#end if
-	#end if
-	if video_format != None :
-		video_format = video_format.upper()
-		if video_format not in valid_video_formats :
-			video_format = None
-		#end if
-	#end if
-	return video_format
+    "implements the video-format preference proposal documented at" \
+    " <http://create.freedesktop.org/wiki/Video_Format_Pref>."
+    video_format = os.environ.get("VIDEO_FORMAT")
+    if video_format == None :
+        config_file = xdg_base_dir.find_first_config_path("video_format")
+        if config_file != None :
+            try :
+                video_format = open(config_file, "r").readline().strip()
+            except IOError :
+                video_format = None
+            #end try
+        #end if
+    #end if
+    if video_format != None :
+        video_format = video_format.upper()
+        if video_format not in valid_video_formats :
+            video_format = None
+        #end if
+    #end if
+    return video_format
 #end get_default_video_format
 
 color_approx_count_factor = 19
@@ -258,34 +258,34 @@ color_approx_count_factor = 19
 
 class Failure(Exception) :
 
-	def __init__(self, Msg) :
-		self.Msg = Msg
-	#end __init__
+    def __init__(self, Msg) :
+        self.Msg = Msg
+    #end __init__
 
 #end Failure
 
 class ns :
-	"""XML namespaces used in SVG files."""
-	svg = "http://www.w3.org/2000/svg"
-	sodipodi = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-	inkscape = "http://www.inkscape.org/namespaces/inkscape"
+    """XML namespaces used in SVG files."""
+    svg = "http://www.w3.org/2000/svg"
+    sodipodi = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+    inkscape = "http://www.inkscape.org/namespaces/inkscape"
 #end ns
 
 def GetSVGLength(Tag, Attr) :
-	"""parses the attribute Attr of the specified Tag as a number optionally
-	followed by a units string, and returns a tuple of the two parts."""
-	Val = re.search("^([0-9\.]+)([a-z\\%]*)$", Tag.get(Attr)).groups()
-	return (float(Val[0]), Val[1])
+    """parses the attribute Attr of the specified Tag as a number optionally
+    followed by a units string, and returns a tuple of the two parts."""
+    Val = re.search("^([0-9\.]+)([a-z\\%]*)$", Tag.get(Attr)).groups()
+    return (float(Val[0]), Val[1])
 #end GetSVGLength
 
 class keyval :
-	"""are there official symbolic names for these anywhere?"""
-	returnkey = 0xff0d
-	enterkey = 0xff8d
-	leftkey = 65361
-	upkey = 65362
-	rightkey = 65363
-	downkey = 65364
+    """are there official symbolic names for these anywhere?"""
+    returnkey = 0xff0d
+    enterkey = 0xff8d
+    leftkey = 65361
+    upkey = 65362
+    rightkey = 65363
+    downkey = 65364
 #end keyval
 
 select_delay = 0.25
@@ -296,233 +296,233 @@ select_delay = 0.25
 #-
 
 def BoxPack(TheWidget, TheBox) :
-	"""packes TheWidget at the start of TheBox and also returns it."""
-	TheBox.pack_start(TheWidget, False, False, 0)
-	return TheWidget
+    """packes TheWidget at the start of TheBox and also returns it."""
+    TheBox.pack_start(TheWidget, False, False, 0)
+    return TheWidget
 #end BoxPack
 
 def NewMenu(InMenuBar, Label) :
-	"""creates a new menu in the specified menu bar with the specified name."""
-	BarMenuItem = gtk.MenuItem(label = Label)
-	TheMenu = gtk.Menu()
-	BarMenuItem.set_submenu(TheMenu)
-	InMenuBar.append(BarMenuItem)
-	return TheMenu
+    """creates a new menu in the specified menu bar with the specified name."""
+    BarMenuItem = gtk.MenuItem(label = Label)
+    TheMenu = gtk.Menu()
+    BarMenuItem.set_submenu(TheMenu)
+    InMenuBar.append(BarMenuItem)
+    return TheMenu
 #end NewMenu
 
 def NewMenuItem(InMenu, Label, AccelGroup, AccelKey, Action) :
-	"""creates a new item in the specified menu with the specified label,
-	action to be performed on selection, and optional accelerator key."""
-	TheItem = gtk.MenuItem(label = Label)
-	TheItem.connect("activate", Action)
-	InMenu.append(TheItem)
-	if AccelGroup != None :
-		TheItem.add_accelerator \
-		  (
-			accel_signal = "activate",
-			accel_group = AccelGroup,
-			accel_key = ord(AccelKey),
-			accel_mods = gtk.gdk.CONTROL_MASK,
-			accel_flags = gtk.ACCEL_VISIBLE
-		  )
-	#end if
-	return TheItem
+    """creates a new item in the specified menu with the specified label,
+    action to be performed on selection, and optional accelerator key."""
+    TheItem = gtk.MenuItem(label = Label)
+    TheItem.connect("activate", Action)
+    InMenu.append(TheItem)
+    if AccelGroup != None :
+        TheItem.add_accelerator \
+          (
+            accel_signal = "activate",
+            accel_group = AccelGroup,
+            accel_key = ord(AccelKey),
+            accel_mods = gtk.gdk.CONTROL_MASK,
+            accel_flags = gtk.ACCEL_VISIBLE
+          )
+    #end if
+    return TheItem
 #end NewMenuItem
 
 def NewMenuSeparatorItem(InMenu) :
-	"""creates a new separator item in the specified menu."""
-	TheItem = gtk.MenuItem(label = None)
-	InMenu.append(TheItem)
+    """creates a new separator item in the specified menu."""
+    TheItem = gtk.MenuItem(label = None)
+    InMenu.append(TheItem)
 #end NewMenuSeparatorItem
 
 def DefineScrollingList \
   (
-	ListModel, # the list/tree model to use
-	Col, # which column of ListModel to get cell value from
-	Heading, # heading for display
-	Bounds, # list bounds
-	Renderer, # defaults to text renderer if omitted
-	ColAttribute, # name of renderer attribute to set to cell value
-	OnSelectionChanged, # the action to connect to the "changed" signal
-	AddToBox, # the HBox or VBox in which to pack the list
+    ListModel, # the list/tree model to use
+    Col, # which column of ListModel to get cell value from
+    Heading, # heading for display
+    Bounds, # list bounds
+    Renderer, # defaults to text renderer if omitted
+    ColAttribute, # name of renderer attribute to set to cell value
+    OnSelectionChanged, # the action to connect to the "changed" signal
+    AddToBox, # the HBox or VBox in which to pack the list
   ) :
-	"""creates a single-column scrolling list of items taken from the specified
-	column of ListModel, with the specified heading."""
-	ListDisplay = gtk.TreeView(ListModel)
-	Column = gtk.TreeViewColumn(Heading)
-	Column.set_alignment(0)
-	ListDisplay.append_column(Column)
-	if Renderer == None :
-		Renderer = gtk.CellRendererText()
-	#end if
-	Column.pack_start(Renderer, True)
-	if ColAttribute == None and hasattr(Renderer, "on_celldata") :
-		Column.set_cell_data_func(Renderer, Renderer.on_celldata, None)
-		  # on_celldata should be a static method
-	else :
-		Column.add_attribute(Renderer, ColAttribute, Col)
-	#end if
-	ListScrolledDisplay = gtk.ScrolledWindow()
-	ListScrolledDisplay.set_policy \
-	  (
-		hscrollbar_policy = gtk.POLICY_NEVER,
-		vscrollbar_policy = gtk.POLICY_ALWAYS
-	  )
-	ListScrolledDisplay.add(ListDisplay)
-	ListScrolledDisplay.set_size_request(*Bounds)
-	BoxPack(ListScrolledDisplay, AddToBox)
-	ListSelection = ListDisplay.get_selection()
-	ListSelection.set_mode(gtk.SELECTION_SINGLE)
-	if OnSelectionChanged != None :
-		ListSelection.connect("changed", OnSelectionChanged)
-	#end if
-	return ListDisplay
+    """creates a single-column scrolling list of items taken from the specified
+    column of ListModel, with the specified heading."""
+    ListDisplay = gtk.TreeView(ListModel)
+    Column = gtk.TreeViewColumn(Heading)
+    Column.set_alignment(0)
+    ListDisplay.append_column(Column)
+    if Renderer == None :
+        Renderer = gtk.CellRendererText()
+    #end if
+    Column.pack_start(Renderer, True)
+    if ColAttribute == None and hasattr(Renderer, "on_celldata") :
+        Column.set_cell_data_func(Renderer, Renderer.on_celldata, None)
+          # on_celldata should be a static method
+    else :
+        Column.add_attribute(Renderer, ColAttribute, Col)
+    #end if
+    ListScrolledDisplay = gtk.ScrolledWindow()
+    ListScrolledDisplay.set_policy \
+      (
+        hscrollbar_policy = gtk.POLICY_NEVER,
+        vscrollbar_policy = gtk.POLICY_ALWAYS
+      )
+    ListScrolledDisplay.add(ListDisplay)
+    ListScrolledDisplay.set_size_request(*Bounds)
+    BoxPack(ListScrolledDisplay, AddToBox)
+    ListSelection = ListDisplay.get_selection()
+    ListSelection.set_mode(gtk.SELECTION_SINGLE)
+    if OnSelectionChanged != None :
+        ListSelection.connect("changed", OnSelectionChanged)
+    #end if
+    return ListDisplay
 #end DefineScrollingList
 
 def GetSingleListSelection(ListDisplay, Col) :
-	"""returns the value from the specified column of the currently-selected item
-	in a list, or None if none."""
-	SelectedItems = ListDisplay.get_selection().get_selected_rows()
-	if len(SelectedItems[1]) != 0 :
-		Selection = tuple(SelectedItems[0][SelectedItems[1][0]])[Col]
-	else :
-		Selection = None
-	#end if
-	return Selection
+    """returns the value from the specified column of the currently-selected item
+    in a list, or None if none."""
+    SelectedItems = ListDisplay.get_selection().get_selected_rows()
+    if len(SelectedItems[1]) != 0 :
+        Selection = tuple(SelectedItems[0][SelectedItems[1][0]])[Col]
+    else :
+        Selection = None
+    #end if
+    return Selection
 #end GetSingleListSelection
 
 class ColorCellRenderer(gtk.GenericCellRenderer) :
-	"""renders a list cell showing a colour with optional opacity."""
+    """renders a list cell showing a colour with optional opacity."""
 
-	#def __init__(self) :
-	#     mustn't be present, or it doesn't get initialized properly
-	#end __init__
+    #def __init__(self) :
+    #     mustn't be present, or it doesn't get initialized properly
+    #end __init__
 
-	def on_get_size(self, DrawWhere, CellRect) :
-		return (0, 0, 160, 20)
-	#end on_get_size
+    def on_get_size(self, DrawWhere, CellRect) :
+        return (0, 0, 160, 20)
+    #end on_get_size
 
-	@staticmethod
-	def on_celldata(Column, Cell, Model, Iter, UserData) :
-		Cell.color = tuple(i / 255 for i in Model.get_value(Iter, 0))
-	#end on_celldata
+    @staticmethod
+    def on_celldata(Column, Cell, Model, Iter, UserData) :
+        Cell.color = tuple(i / 255 for i in Model.get_value(Iter, 0))
+    #end on_celldata
 
-	def on_render(self, DrawWhere, DrawOwner, BackgroundRect, CellRect, ExposeRect, Flags) :
-		Draw = gtk.gdk.GC(DrawWhere)
-		ColorMap = Draw.get_colormap()
-		Draw.set_function(gtk.gdk.COPY)
-		Draw.set_foreground \
-		  (
-			ColorMap.alloc_color
-			  (
-				gtk.gdk.Color
-				  (
-					*tuple
-					  (
-						int(round(c * 65535)) # premultiplied alpha will give darkening effect
-						for c in self.color[:3]
-					  )
-				  )
-			  )
-		  )
-		DrawWhere.draw_rectangle \
-		  (
-			Draw,
-			True,
-			CellRect.x,
-			CellRect.y,
-			CellRect.width,
-			CellRect.height
-		  )
-		if Flags == gtk.CELL_RENDERER_SELECTED :
-			Draw.set_function(gtk.gdk.INVERT)
-			Draw.set_line_attributes \
-			  (
-				line_width = 2,
-				line_style = gtk.gdk.LINE_SOLID,
-				cap_style = gtk.gdk.CAP_BUTT,
-				join_style = gtk.gdk.JOIN_MITER
-			  )
-			DrawWhere.draw_rectangle \
-			  (
-				Draw,
-				False,
-				CellRect.x,
-				CellRect.y,
-				CellRect.width,
-				CellRect.height
-			  )
-		#end if
-	#end on_render
+    def on_render(self, DrawWhere, DrawOwner, BackgroundRect, CellRect, ExposeRect, Flags) :
+        Draw = gtk.gdk.GC(DrawWhere)
+        ColorMap = Draw.get_colormap()
+        Draw.set_function(gtk.gdk.COPY)
+        Draw.set_foreground \
+          (
+            ColorMap.alloc_color
+              (
+                gtk.gdk.Color
+                  (
+                    *tuple
+                      (
+                        int(round(c * 65535)) # premultiplied alpha will give darkening effect
+                        for c in self.color[:3]
+                      )
+                  )
+              )
+          )
+        DrawWhere.draw_rectangle \
+          (
+            Draw,
+            True,
+            CellRect.x,
+            CellRect.y,
+            CellRect.width,
+            CellRect.height
+          )
+        if Flags == gtk.CELL_RENDERER_SELECTED :
+            Draw.set_function(gtk.gdk.INVERT)
+            Draw.set_line_attributes \
+              (
+                line_width = 2,
+                line_style = gtk.gdk.LINE_SOLID,
+                cap_style = gtk.gdk.CAP_BUTT,
+                join_style = gtk.gdk.JOIN_MITER
+              )
+            DrawWhere.draw_rectangle \
+              (
+                Draw,
+                False,
+                CellRect.x,
+                CellRect.y,
+                CellRect.width,
+                CellRect.height
+              )
+        #end if
+    #end on_render
 
-	def on_activate(self, TheEvent, EventTarget, LocationPath, BackgroundRect, CellRect, Flags) :
-		pass
-	#end on_activate
+    def on_activate(self, TheEvent, EventTarget, LocationPath, BackgroundRect, CellRect, Flags) :
+        pass
+    #end on_activate
 
 #end ColorCellRenderer
 
 def MsgAlert(Msg, Type) :
-	"""displays a simple alert message with an OK button."""
-	TheDialog = gtk.MessageDialog \
-	  (
-		flags = gtk.DIALOG_MODAL,
-		buttons = gtk.BUTTONS_OK,
-		type = Type,
-		message_format = Msg
-	  )
-	Response = TheDialog.run()
-	TheDialog.destroy()
+    """displays a simple alert message with an OK button."""
+    TheDialog = gtk.MessageDialog \
+      (
+        flags = gtk.DIALOG_MODAL,
+        buttons = gtk.BUTTONS_OK,
+        type = Type,
+        message_format = Msg
+      )
+    Response = TheDialog.run()
+    TheDialog.destroy()
 #end MsgAlert
 
 def ErrorAlert(Msg) :
-	"""displays a simple modal alert error message box."""
-	MsgAlert(Msg, gtk.MESSAGE_ERROR)
+    """displays a simple modal alert error message box."""
+    MsgAlert(Msg, gtk.MESSAGE_ERROR)
 #end ErrorAlert
 
 def ChooseOpenFile(Prompt, Filters) :
-	"""lets the user choose a file matching the specified filters, returning
-	its pathname on success or None if user cancelled."""
-	TheDialog = gtk.FileChooserDialog \
-	  (
-		title = Prompt,
-		action = gtk.FILE_CHOOSER_ACTION_OPEN,
-		buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
-	  )
-	for Name, Pats in Filters :
-		TheFilter = gtk.FileFilter()
-		TheFilter.set_name(Name)
-		for Pat in Pats :
-			TheFilter.add_pattern(Pat)
-		#end for
-		TheDialog.add_filter(TheFilter)
-	#end for
-	Response = TheDialog.run()
-	if Response == gtk.RESPONSE_OK :
-		ChosenFileName = TheDialog.get_filename()
-	else :
-		ChosenFileName = None
-	#end if
-	TheDialog.destroy()
-	return ChosenFileName
+    """lets the user choose a file matching the specified filters, returning
+    its pathname on success or None if user cancelled."""
+    TheDialog = gtk.FileChooserDialog \
+      (
+        title = Prompt,
+        action = gtk.FILE_CHOOSER_ACTION_OPEN,
+        buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+      )
+    for Name, Pats in Filters :
+        TheFilter = gtk.FileFilter()
+        TheFilter.set_name(Name)
+        for Pat in Pats :
+            TheFilter.add_pattern(Pat)
+        #end for
+        TheDialog.add_filter(TheFilter)
+    #end for
+    Response = TheDialog.run()
+    if Response == gtk.RESPONSE_OK :
+        ChosenFileName = TheDialog.get_filename()
+    else :
+        ChosenFileName = None
+    #end if
+    TheDialog.destroy()
+    return ChosenFileName
 #end ChooseOpenFile
 
 def ForgetButtonBlink() :
-	if MainWindow.ButtonBlinkTask != None :
-		glib.source_remove(MainWindow.ButtonBlinkTask)
-		MainWindow.ButtonBlinkTask = None
-	#end if
-	MainWindow.ButtonSelected = False
+    if MainWindow.ButtonBlinkTask != None :
+        glib.source_remove(MainWindow.ButtonBlinkTask)
+        MainWindow.ButtonBlinkTask = None
+    #end if
+    MainWindow.ButtonSelected = False
 #end ForgetButtonBlink
 
 def BlinkHighlightedButton() :
-	ForgetButtonBlink()
-	MainWindow.ButtonBlinkTask = glib.timeout_add \
-	  (
-		int(round(select_delay * 1000)),
-		ButtonSelectionDone
-	  )
-	MainWindow.ButtonSelected = True
-	DisplayImage()
+    ForgetButtonBlink()
+    MainWindow.ButtonBlinkTask = glib.timeout_add \
+      (
+        int(round(select_delay * 1000)),
+        ButtonSelectionDone
+      )
+    MainWindow.ButtonSelected = True
+    DisplayImage()
 #end BlinkHighlightedButton
 
 #+
@@ -530,14 +530,14 @@ def BlinkHighlightedButton() :
 #-
 
 class MainWindow :
-	# Window -- gtk.Window object for main window
-	pass
+    # Window -- gtk.Window object for main window
+    pass
 #end MainWindow
 
 class LoadedImage :
-	# Contents -- parsed XML contents of image file
-	# FileName -- pathname of image file
-	pass
+    # Contents -- parsed XML contents of image file
+    # FileName -- pathname of image file
+    pass
 #end LoadedImage
 
 #+
@@ -545,521 +545,521 @@ class LoadedImage :
 #-
 
 def ImageAsSVG() :
-	"""returns the loaded image in SVG textual form."""
-	return XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8")
+    """returns the loaded image in SVG textual form."""
+    return XMLElementTree.tostring(LoadedImage.Contents.getroot(), "utf-8")
 #end ImageAsSVG
 
 def RenderImagePix() :
-	"""allocates an array object and fills it with a pixel representation of the
-	loaded image."""
-	Pixels = array.array \
-	  (
-		"B",
-			(0, 0, 0, 0) # for correct treatment of non-opaque image pixels
-		*
-			(LoadedImage.RowStride // 4 * LoadedImage.ImageDrawSize[1])
-	  )
-	OffscreenPix = cairo.ImageSurface.create_for_data \
-	  (
-		Pixels, # data
-		cairo.FORMAT_ARGB32, # format
-		LoadedImage.ImageDrawSize[0], # width
-		LoadedImage.ImageDrawSize[1], # height
-		LoadedImage.RowStride # stride
-	  )
-	Offscreen = cairo.Context(OffscreenPix)
-	Offscreen.identity_matrix()
-	ScaleFactor = min \
-	  (
-		LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
-		LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
-	  ) # make sure it's all visible
-	Offscreen.scale(ScaleFactor, ScaleFactor)
-	svg = rsvg.Handle(data = ImageAsSVG())
-	svg.render_cairo(Offscreen)
-	OffscreenPix.flush()
-	return Pixels
+    """allocates an array object and fills it with a pixel representation of the
+    loaded image."""
+    Pixels = array.array \
+      (
+        "B",
+            (0, 0, 0, 0) # for correct treatment of non-opaque image pixels
+        *
+            (LoadedImage.RowStride // 4 * LoadedImage.ImageDrawSize[1])
+      )
+    OffscreenPix = cairo.ImageSurface.create_for_data \
+      (
+        Pixels, # data
+        cairo.FORMAT_ARGB32, # format
+        LoadedImage.ImageDrawSize[0], # width
+        LoadedImage.ImageDrawSize[1], # height
+        LoadedImage.RowStride # stride
+      )
+    Offscreen = cairo.Context(OffscreenPix)
+    Offscreen.identity_matrix()
+    ScaleFactor = min \
+      (
+        LoadedImage.ImageDrawSize[0] / LoadedImage.SrcDimensions[0],
+        LoadedImage.ImageDrawSize[1] / LoadedImage.SrcDimensions[1],
+      ) # make sure it's all visible
+    Offscreen.scale(ScaleFactor, ScaleFactor)
+    svg = rsvg.Handle(data = ImageAsSVG())
+    svg.render_cairo(Offscreen)
+    OffscreenPix.flush()
+    return Pixels
 #end RenderImagePix
 
 def AnalyzeImage() :
-	"""hides the button layer and determines what colours are present in the rest
-	of the image."""
-	LoadedImage.ImageDrawSize = ((480, 360), (640, 360))[LoadedImage.Widescreen]
-	if hasattr(cairo, "format_stride_for_width") :
-		LoadedImage.RowStride = cairo.format_stride_for_width \
-		  (
-			cairo.FORMAT_ARGB32,
-			LoadedImage.ImageDrawSize[0]
-		  )
-	else :
-		LoadedImage.RowStride = LoadedImage.ImageDrawSize[0] * 4
-	#end if
-	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
-	for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
-		LayerID = Layer.get("id")
-		if LayerID in LoadedImage.Layers :
-			Layer.set \
-			  (
-				"style",
-					"display:"
-				+
-					("none", "inline")
-						[LayerID != SelectedLayerID and LoadedImage.Layers[LayerID]["visible"]]
-						  # set button layer to invisible, restore visibility of rest to
-						  # original state
-			  )
-		#end if
-	#end for
-	LoadedImage.IndexedImage, LoadedImage.Colors = \
-		spuhelper.index_image(RenderImagePix(), color_approx_count_factor)
-	LoadedImage.ColorShowing = 0
-	if LoadedImage.IndexedImage == None :
-		if True : # debug
-			PixTotal = 0
-			for Color in LoadedImage.Colors :
-				PixTotal += Color[1]
-			#end for
-			DebugColors = tuple((color, freq / PixTotal) for color, freq in LoadedImage.Colors[:4])
-			TopTotal = 0
-			for Color in DebugColors :
-				TopTotal += Color[1]
-			#end for
-			sys.stderr.write("top colours: %s = %.3f\n" % (repr(DebugColors), TopTotal)) # debug
-		#end if
-		Msg = \
-			(
-				"<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
-			%
-				len(LoadedImage.Colors)
-			)
-		UseColors = ()
-	else :
-		Msg = ""
-		MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
-		for Button in MainWindow.ColorButtonGroup.get_group() :
-			Index = Button.get_data("index")
-			Button.set_active(Index == 0)
-			Button.set_flags(gtk.SENSITIVE)
-		#end for
-		MainWindow.Loading = False
-	#end if
-	UseColors = LoadedImage.Colors
-	for \
-		ColorList \
-	in \
-		(
-			MainWindow.ColorsNormalList,
-			MainWindow.ColorsHighlightedList,
-			MainWindow.ColorsSelectedList,
-		) \
-	:
-		ColorList.clear()
-		for Color in UseColors :
-			ColorList.append((Color[0],))
-		#end for
-		UseColors = UseColors[:4] # no more than 4 for highlighted & selected lists
-	#end for
-	MainWindow.StatusMsg.set_markup(Msg)
+    """hides the button layer and determines what colours are present in the rest
+    of the image."""
+    LoadedImage.ImageDrawSize = ((480, 360), (640, 360))[LoadedImage.Widescreen]
+    if hasattr(cairo, "format_stride_for_width") :
+        LoadedImage.RowStride = cairo.format_stride_for_width \
+          (
+            cairo.FORMAT_ARGB32,
+            LoadedImage.ImageDrawSize[0]
+          )
+    else :
+        LoadedImage.RowStride = LoadedImage.ImageDrawSize[0] * 4
+    #end if
+    SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
+    for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+        LayerID = Layer.get("id")
+        if LayerID in LoadedImage.Layers :
+            Layer.set \
+              (
+                "style",
+                    "display:"
+                +
+                    ("none", "inline")
+                        [LayerID != SelectedLayerID and LoadedImage.Layers[LayerID]["visible"]]
+                          # set button layer to invisible, restore visibility of rest to
+                          # original state
+              )
+        #end if
+    #end for
+    LoadedImage.IndexedImage, LoadedImage.Colors = \
+        spuhelper.index_image(RenderImagePix(), color_approx_count_factor)
+    LoadedImage.ColorShowing = 0
+    if LoadedImage.IndexedImage == None :
+        if True : # debug
+            PixTotal = 0
+            for Color in LoadedImage.Colors :
+                PixTotal += Color[1]
+            #end for
+            DebugColors = tuple((color, freq / PixTotal) for color, freq in LoadedImage.Colors[:4])
+            TopTotal = 0
+            for Color in DebugColors :
+                TopTotal += Color[1]
+            #end for
+            sys.stderr.write("top colours: %s = %.3f\n" % (repr(DebugColors), TopTotal)) # debug
+        #end if
+        Msg = \
+            (
+                "<span foreground=\"#FF0000\">%d colours is too many, mustn't exceed 4</span>"
+            %
+                len(LoadedImage.Colors)
+            )
+        UseColors = ()
+    else :
+        Msg = ""
+        MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
+        for Button in MainWindow.ColorButtonGroup.get_group() :
+            Index = Button.get_data("index")
+            Button.set_active(Index == 0)
+            Button.set_flags(gtk.SENSITIVE)
+        #end for
+        MainWindow.Loading = False
+    #end if
+    UseColors = LoadedImage.Colors
+    for \
+        ColorList \
+    in \
+        (
+            MainWindow.ColorsNormalList,
+            MainWindow.ColorsHighlightedList,
+            MainWindow.ColorsSelectedList,
+        ) \
+    :
+        ColorList.clear()
+        for Color in UseColors :
+            ColorList.append((Color[0],))
+        #end for
+        UseColors = UseColors[:4] # no more than 4 for highlighted & selected lists
+    #end for
+    MainWindow.StatusMsg.set_markup(Msg)
 #end AnalyzeImage
 
 def DisplayImage() :
-	"""(re)displays the currently-loaded SVG image."""
-	if LoadedImage.Contents != None :
-		HighlightPixels = None # to begin with
-		if LoadedImage.ColorShowing == 0 :
-			ImagePixels = RenderImagePix()
-		else :
-			ColorList = \
-				(
-					MainWindow.ColorsNormalList,
-					MainWindow.ColorsHighlightedList,
-					MainWindow.ColorsSelectedList,
-					MainWindow.ColorsNormalList
-				)[LoadedImage.ColorShowing - 1]
-			Colors = tuple(Color[0] for Color in ColorList)
-			ImagePixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
-			if MainWindow.ButtonHighlight != None and LoadedImage.ColorShowing == 4 :
-				HighlightPixels = spuhelper.expand_image \
-				  (
-					LoadedImage.IndexedImage,
-					tuple
-					  (
-						Color[0]
-						for Color in
-							(
-								MainWindow.ColorsHighlightedList,
-								MainWindow.ColorsSelectedList
-							)[MainWindow.ButtonSelected]
-					  )
-				  )
-			#end if
-		#end if
-		Light, Dark = 0xFFD6D6D6, 0xFFACACAC
-		  # same colours that gtk.ColorSelection uses for background of opacity display
-		PatternArray = array.array \
-		  (
-			"I",
-				16 * (16 * (Light,) + 16 * (Dark,))
-			+
-				16 * (16 * (Dark,) + 16 * (Light,))
-		  )
-		CheckPattern = cairo.SurfacePattern \
-		  (
-			cairo.ImageSurface.create_for_data
-			  (
-				PatternArray, # data
-				cairo.FORMAT_ARGB32, # format
-				32, # width
-				32, # height
-				32 * 4 # stride
-			  )
-		  ) # to show through less-than-fully-opaque pixels
-		CheckPattern.set_extend(cairo.EXTEND_REPEAT)
-		DisplayPixels = array.array \
-		  (
-			"B", # not "I" because then tostring puts the bytes in the wrong order
-			(255, 255, 255, 255) * LoadedImage.ImageDrawSize[1] * (LoadedImage.RowStride // 4)
-			  # initial colour doesn't matter, will be replaced by CheckPattern
-		  )
-		CompositeSurface = cairo.ImageSurface.create_for_data \
-		  (
-			DisplayPixels, # data
-			cairo.FORMAT_ARGB32, # format
-			LoadedImage.ImageDrawSize[0], # width
-			LoadedImage.ImageDrawSize[1], # height
-			LoadedImage.RowStride # stride
-		  )
-		Composite = cairo.Context(CompositeSurface)
-		Composite.set_source(CheckPattern)
-		Composite.paint()
-		if LoadedImage.Background != None :
-			BackgroundPattern = cairo.SurfacePattern(LoadedImage.Background)
-			BackgroundPattern.set_matrix \
-			  (
-				RectMatrix
-				  (
-					(0, 0) + LoadedImage.ImageDrawSize,
-					(0, 0, LoadedImage.Background.get_width(), LoadedImage.Background.get_height())
-				  )
-			  ) # distort as necessary to fit dimensions of menu
-			Composite.set_source(BackgroundPattern)
-			Composite.paint()
-		#end if
-		Composite.set_source_surface \
-		  (
-			cairo.ImageSurface.create_for_data
-			  (
-				ImagePixels, # data
-				cairo.FORMAT_ARGB32, # format
-				LoadedImage.ImageDrawSize[0], # width
-				LoadedImage.ImageDrawSize[1], # height
-				LoadedImage.RowStride # stride
-			  )
-		  )
-		Composite.paint()
-		if HighlightPixels != None :
-			Composite.set_source_surface \
-			  (
-				cairo.ImageSurface.create_for_data
-				  (
-					HighlightPixels, # data
-					cairo.FORMAT_ARGB32, # format
-					LoadedImage.ImageDrawSize[0], # width
-					LoadedImage.ImageDrawSize[1], # height
-					LoadedImage.RowStride # stride
-				  )
-			  )
-			Composite.rectangle(*MainWindow.ButtonHighlightRect)
-			Composite.fill()
-		#end if
-		CompositeSurface.flush()
-		spuhelper.cairo_to_gtk(DisplayPixels)
-		Offscreen = gtk.gdk.pixbuf_new_from_data \
-		  (
-			data = DisplayPixels.tostring(),
-			colorspace = gtk.gdk.COLORSPACE_RGB,
-			has_alpha = True,
-			bits_per_sample = 8,
-			width = LoadedImage.ImageDrawSize[0],
-			height = LoadedImage.ImageDrawSize[1],
-			rowstride = LoadedImage.RowStride
-		  )
-		MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
-	#end if
+    """(re)displays the currently-loaded SVG image."""
+    if LoadedImage.Contents != None :
+        HighlightPixels = None # to begin with
+        if LoadedImage.ColorShowing == 0 :
+            ImagePixels = RenderImagePix()
+        else :
+            ColorList = \
+                (
+                    MainWindow.ColorsNormalList,
+                    MainWindow.ColorsHighlightedList,
+                    MainWindow.ColorsSelectedList,
+                    MainWindow.ColorsNormalList
+                )[LoadedImage.ColorShowing - 1]
+            Colors = tuple(Color[0] for Color in ColorList)
+            ImagePixels = spuhelper.expand_image(LoadedImage.IndexedImage, Colors)
+            if MainWindow.ButtonHighlight != None and LoadedImage.ColorShowing == 4 :
+                HighlightPixels = spuhelper.expand_image \
+                  (
+                    LoadedImage.IndexedImage,
+                    tuple
+                      (
+                        Color[0]
+                        for Color in
+                            (
+                                MainWindow.ColorsHighlightedList,
+                                MainWindow.ColorsSelectedList
+                            )[MainWindow.ButtonSelected]
+                      )
+                  )
+            #end if
+        #end if
+        Light, Dark = 0xFFD6D6D6, 0xFFACACAC
+          # same colours that gtk.ColorSelection uses for background of opacity display
+        PatternArray = array.array \
+          (
+            "I",
+                16 * (16 * (Light,) + 16 * (Dark,))
+            +
+                16 * (16 * (Dark,) + 16 * (Light,))
+          )
+        CheckPattern = cairo.SurfacePattern \
+          (
+            cairo.ImageSurface.create_for_data
+              (
+                PatternArray, # data
+                cairo.FORMAT_ARGB32, # format
+                32, # width
+                32, # height
+                32 * 4 # stride
+              )
+          ) # to show through less-than-fully-opaque pixels
+        CheckPattern.set_extend(cairo.EXTEND_REPEAT)
+        DisplayPixels = array.array \
+          (
+            "B", # not "I" because then tostring puts the bytes in the wrong order
+            (255, 255, 255, 255) * LoadedImage.ImageDrawSize[1] * (LoadedImage.RowStride // 4)
+              # initial colour doesn't matter, will be replaced by CheckPattern
+          )
+        CompositeSurface = cairo.ImageSurface.create_for_data \
+          (
+            DisplayPixels, # data
+            cairo.FORMAT_ARGB32, # format
+            LoadedImage.ImageDrawSize[0], # width
+            LoadedImage.ImageDrawSize[1], # height
+            LoadedImage.RowStride # stride
+          )
+        Composite = cairo.Context(CompositeSurface)
+        Composite.set_source(CheckPattern)
+        Composite.paint()
+        if LoadedImage.Background != None :
+            BackgroundPattern = cairo.SurfacePattern(LoadedImage.Background)
+            BackgroundPattern.set_matrix \
+              (
+                RectMatrix
+                  (
+                    (0, 0) + LoadedImage.ImageDrawSize,
+                    (0, 0, LoadedImage.Background.get_width(), LoadedImage.Background.get_height())
+                  )
+              ) # distort as necessary to fit dimensions of menu
+            Composite.set_source(BackgroundPattern)
+            Composite.paint()
+        #end if
+        Composite.set_source_surface \
+          (
+            cairo.ImageSurface.create_for_data
+              (
+                ImagePixels, # data
+                cairo.FORMAT_ARGB32, # format
+                LoadedImage.ImageDrawSize[0], # width
+                LoadedImage.ImageDrawSize[1], # height
+                LoadedImage.RowStride # stride
+              )
+          )
+        Composite.paint()
+        if HighlightPixels != None :
+            Composite.set_source_surface \
+              (
+                cairo.ImageSurface.create_for_data
+                  (
+                    HighlightPixels, # data
+                    cairo.FORMAT_ARGB32, # format
+                    LoadedImage.ImageDrawSize[0], # width
+                    LoadedImage.ImageDrawSize[1], # height
+                    LoadedImage.RowStride # stride
+                  )
+              )
+            Composite.rectangle(*MainWindow.ButtonHighlightRect)
+            Composite.fill()
+        #end if
+        CompositeSurface.flush()
+        spuhelper.cairo_to_gtk(DisplayPixels)
+        Offscreen = gtk.gdk.pixbuf_new_from_data \
+          (
+            data = DisplayPixels.tostring(),
+            colorspace = gtk.gdk.COLORSPACE_RGB,
+            has_alpha = True,
+            bits_per_sample = 8,
+            width = LoadedImage.ImageDrawSize[0],
+            height = LoadedImage.ImageDrawSize[1],
+            rowstride = LoadedImage.RowStride
+          )
+        MainWindow.ImageDisplay.set_from_pixbuf(Offscreen)
+    #end if
 #end DisplayImage
 
 def LoadMenuImage(FileName) :
-	"""loads a new SVG image file and also collects various useful information about it."""
-	try :
-		try :
-			NewContents = XMLElementTree.parse(FileName)
-		except ExpatError :
-			raise Failure("Not a valid SVG file.")
-		except IOError, Why :
-			raise Failure(str(Why))
-		#end try
-		NewLayers = {}
-		NewLayerList = []
-		SVGTag = NewContents.getroot()
-		NewSrcDimensions = (GetSVGLength(SVGTag, "width")[0], GetSVGLength(SVGTag, "height")[0])
-		  # note I don't care what the units are, I'm just assuming they're the same
-		AspectRatio = NewSrcDimensions[0] / NewSrcDimensions[1]
-		AspectTolerance = 0.05 # give user some room to be sloppy
-		if abs(AspectRatio / 4 * 3 - 1) <= AspectTolerance :
-			Widescreen = False
-		elif abs(AspectRatio / 16 * 9 - 1) <= AspectTolerance :
-			Widescreen = True
-		else :
-			raise Failure("Image dimensions cannot be approximated as either 4:3 or 16:9")
-		#end if
-		for Layer in NewContents.findall("{%s}g" % ns.svg) :
-			if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
-				LayerID = Layer.get("id")
-				NewLayers[LayerID] = \
-					{
-						"visible" : Layer.get("style") != "display:none",
-						  # save initial visibility state
-						  # Assumption: Inkscape only sets style attribute to "display:inline"
-						  # for visible layers and "display:none" for invisible ones
-					}
-				NewLayerList.append \
-				  (
-					(Layer.get("{%s}label" % ns.inkscape), LayerID)
-				  )
-			#end if
-		#end for
-		if len(NewLayerList) == 0 :
-			raise Failure("No layers found in document. Are you sure it was created by Inkscape?")
-		#end if
-		if len(NewLayerList) == 1 :
-			raise Failure("Need at least 2 layers, one for buttons and the rest for the image.")
-		#end if
-		# passed all validation checks
-		MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
-		LoadedImage.FileName = FileName
-		LoadedImage.Contents = NewContents
-		LoadedImage.SrcDimensions = NewSrcDimensions
-		LoadedImage.Widescreen = Widescreen
-		MainWindow.LayerList.clear()
-		for Layer in NewLayerList :
-			MainWindow.LayerList.append(Layer)
-		#end for
-		LoadedImage.Layers = NewLayers
-		MainWindow.LayerDisplay.get_selection().select_path((len(MainWindow.LayerList) - 1,))
-		  # default to using top layer as buttons
-		LoadedImage.ColorShowing = 0
-		for Button in MainWindow.ColorButtonGroup.get_group() :
-			Index = Button.get_data("index")
-			Button.set_active(Index == 0)
-			(Button.unset_flags, Button.set_flags)[Index == 0](gtk.SENSITIVE)
-		#end for
-		MainWindow.Loading = False
-		ForgetButtonBlink()
-		AnalyzeImage()
-		DisplayImage()
-	except Failure, Reason :
-		ErrorAlert(Reason.Msg)
-	#end try
+    """loads a new SVG image file and also collects various useful information about it."""
+    try :
+        try :
+            NewContents = XMLElementTree.parse(FileName)
+        except ExpatError :
+            raise Failure("Not a valid SVG file.")
+        except IOError, Why :
+            raise Failure(str(Why))
+        #end try
+        NewLayers = {}
+        NewLayerList = []
+        SVGTag = NewContents.getroot()
+        NewSrcDimensions = (GetSVGLength(SVGTag, "width")[0], GetSVGLength(SVGTag, "height")[0])
+          # note I don't care what the units are, I'm just assuming they're the same
+        AspectRatio = NewSrcDimensions[0] / NewSrcDimensions[1]
+        AspectTolerance = 0.05 # give user some room to be sloppy
+        if abs(AspectRatio / 4 * 3 - 1) <= AspectTolerance :
+            Widescreen = False
+        elif abs(AspectRatio / 16 * 9 - 1) <= AspectTolerance :
+            Widescreen = True
+        else :
+            raise Failure("Image dimensions cannot be approximated as either 4:3 or 16:9")
+        #end if
+        for Layer in NewContents.findall("{%s}g" % ns.svg) :
+            if Layer.get("{%s}groupmode" % ns.inkscape) == "layer" :
+                LayerID = Layer.get("id")
+                NewLayers[LayerID] = \
+                    {
+                        "visible" : Layer.get("style") != "display:none",
+                          # save initial visibility state
+                          # Assumption: Inkscape only sets style attribute to "display:inline"
+                          # for visible layers and "display:none" for invisible ones
+                    }
+                NewLayerList.append \
+                  (
+                    (Layer.get("{%s}label" % ns.inkscape), LayerID)
+                  )
+            #end if
+        #end for
+        if len(NewLayerList) == 0 :
+            raise Failure("No layers found in document. Are you sure it was created by Inkscape?")
+        #end if
+        if len(NewLayerList) == 1 :
+            raise Failure("Need at least 2 layers, one for buttons and the rest for the image.")
+        #end if
+        # passed all validation checks
+        MainWindow.Loading = True # suspend triggering of ColorDisplayChanged
+        LoadedImage.FileName = FileName
+        LoadedImage.Contents = NewContents
+        LoadedImage.SrcDimensions = NewSrcDimensions
+        LoadedImage.Widescreen = Widescreen
+        MainWindow.LayerList.clear()
+        for Layer in NewLayerList :
+            MainWindow.LayerList.append(Layer)
+        #end for
+        LoadedImage.Layers = NewLayers
+        MainWindow.LayerDisplay.get_selection().select_path((len(MainWindow.LayerList) - 1,))
+          # default to using top layer as buttons
+        LoadedImage.ColorShowing = 0
+        for Button in MainWindow.ColorButtonGroup.get_group() :
+            Index = Button.get_data("index")
+            Button.set_active(Index == 0)
+            (Button.unset_flags, Button.set_flags)[Index == 0](gtk.SENSITIVE)
+        #end for
+        MainWindow.Loading = False
+        ForgetButtonBlink()
+        AnalyzeImage()
+        DisplayImage()
+    except Failure, Reason :
+        ErrorAlert(Reason.Msg)
+    #end try
 #end LoadMenuImage
 
 def LoadBackgroundImage(FileName) :
-	"""loads a new background image."""
-	try :
-		try :
-			ImagePixBuf = gtk.gdk.pixbuf_new_from_file(FileName)
-		except glib.GError, Why :
-			raise Failure(str(Why))
-		#end try
-		ImagePixArray = spuhelper.gtk_to_cairo_a(ImagePixBuf)
-		LoadedImage.Background = cairo.ImageSurface.create_for_data \
-		  (
-			ImagePixArray, # data
-			cairo.FORMAT_ARGB32, # format
-			ImagePixBuf.get_property("width"), # width
-			ImagePixBuf.get_property("height"), # height
-			ImagePixBuf.get_property("width") * 4 # stride
-		  )
-		ForgetButtonBlink()
-		DisplayImage()
-	except Failure, Reason :
-		ErrorAlert(Reason.Msg)
-	#end try
+    """loads a new background image."""
+    try :
+        try :
+            ImagePixBuf = gtk.gdk.pixbuf_new_from_file(FileName)
+        except glib.GError, Why :
+            raise Failure(str(Why))
+        #end try
+        ImagePixArray = spuhelper.gtk_to_cairo_a(ImagePixBuf)
+        LoadedImage.Background = cairo.ImageSurface.create_for_data \
+          (
+            ImagePixArray, # data
+            cairo.FORMAT_ARGB32, # format
+            ImagePixBuf.get_property("width"), # width
+            ImagePixBuf.get_property("height"), # height
+            ImagePixBuf.get_property("width") * 4 # stride
+          )
+        ForgetButtonBlink()
+        DisplayImage()
+    except Failure, Reason :
+        ErrorAlert(Reason.Msg)
+    #end try
 #end LoadBackgroundImage
 
 def LoadColors(PaletteFileName) :
-	"""loads a palette file of colours to choose from."""
-	try :
-		try :
-			PaletteFile = open(PaletteFileName, "r")
-		except IOError, Why :
-			raise Failure(str(Why))
-		#end try
-		if PaletteFile.readline().strip() != "GIMP Palette" :
-			raise Failure("doesn't look like a GIMP palette file")
-		#end if
-		Name = "Untitled"
-		while True :
-			line = PaletteFile.readline()
-			if len(line) == 0 :
-				raise Failure("palette file seems to be empty")
-			#end if
-			line = line.rstrip("\n")
-			if line.startswith("Name: ") :
-				Name = line[6:].strip()
-			#end if
-			if line.startswith("#") :
-				break
-		#end while
-		Colors = []
-		while True :
-			line = PaletteFile.readline()
-			if len(line) == 0 :
-				break
-			if not line.startswith("#") :
-				line = line.rstrip("\n")
-				components = line.split("\t", 1)
-				if len(components) == 1 :
-					components.append("") # empty name
-				#end if
-				try :
-					color = tuple(int(i.strip()) for i in components[0].split(None, 2))
-				except ValueError :
-					raise Failure("bad colour on line %s" % repr(line))
-				#end try
-				Colors.append((color, components[1]))
-			#end if
-		#end while
-	  # all successfully loaded
-		MainWindow.LoadedColorsList.clear()
-		for color in Colors :
-			MainWindow.LoadedColorsList.append((color[0],)) # fixme display name as well
-		#end for
-		MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
-	except Failure, Reason :
-		ErrorAlert(Reason.Msg)
-	#end try
+    """loads a palette file of colours to choose from."""
+    try :
+        try :
+            PaletteFile = open(PaletteFileName, "r")
+        except IOError, Why :
+            raise Failure(str(Why))
+        #end try
+        if PaletteFile.readline().strip() != "GIMP Palette" :
+            raise Failure("doesn't look like a GIMP palette file")
+        #end if
+        Name = "Untitled"
+        while True :
+            line = PaletteFile.readline()
+            if len(line) == 0 :
+                raise Failure("palette file seems to be empty")
+            #end if
+            line = line.rstrip("\n")
+            if line.startswith("Name: ") :
+                Name = line[6:].strip()
+            #end if
+            if line.startswith("#") :
+                break
+        #end while
+        Colors = []
+        while True :
+            line = PaletteFile.readline()
+            if len(line) == 0 :
+                break
+            if not line.startswith("#") :
+                line = line.rstrip("\n")
+                components = line.split("\t", 1)
+                if len(components) == 1 :
+                    components.append("") # empty name
+                #end if
+                try :
+                    color = tuple(int(i.strip()) for i in components[0].split(None, 2))
+                except ValueError :
+                    raise Failure("bad colour on line %s" % repr(line))
+                #end try
+                Colors.append((color, components[1]))
+            #end if
+        #end while
+      # all successfully loaded
+        MainWindow.LoadedColorsList.clear()
+        for color in Colors :
+            MainWindow.LoadedColorsList.append((color[0],)) # fixme display name as well
+        #end for
+        MainWindow.LoadedColorsDisplay.get_column(0).set_title(Name)
+    except Failure, Reason :
+        ErrorAlert(Reason.Msg)
+    #end try
 #end LoadColors
 
 def LoadSavedColors(MenuFileName) :
-	"""reloads the colour palettes from a previously-saved menu XML file."""
-	try :
-		try :
-			MenuContents = XMLElementTree.parse(MenuFileName)
-		except ExpatError :
-			raise Failure("Not a valid XML file.")
-		#end try
-		FindTag = MenuContents.getroot()
-		if FindTag != None :
-			FindTag = FindTag.find("stream")
-		#end if
-		if FindTag != None :
-			FindTag = FindTag.find("spu")
-		#end if
-		if FindTag == None :
-			raise Failure("can't make sense of contents of menu XML file")
-		#end if
-		Succeeded = []
-		Failed = []
-		for \
-			Description, Attr, ColorList \
-		in \
-			(
-				("normal", "image", MainWindow.ColorsNormalList),
-				("highlighted", "highlight", MainWindow.ColorsHighlightedList),
-				("selected", "select", MainWindow.ColorsSelectedList),
-			) \
-		:
-			ImageName = FindTag.get(Attr)
-			if ImageName != None :
-				try :
-					if not ImageName.startswith("/") :
-						ImageName = os.path.join(os.path.dirname(MenuFileName), ImageName)
-					#end if
-					try :
-						ImageFile = open(ImageName, "r")
-					except IOError :
-						raise Failure("couldn't open %s" % ImageName)
-					#end try
-					try :
-						Colors = spuhelper.read_png_palette(ImageFile)
-					except RuntimeError :
-						raise Failure("couldn't make sense of %s" % ImageName)
-					#end try
-					if Colors == None :
-						raise Failure("no palette in PNG file %s" % ImageName)
-					#end if
-					for i, Color in enumerate(Colors[:4]) :
-						ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
-					#end for
-					Succeeded.append(Description)
-				except Failure :
-					Failed.append(ImageName)
-				#end try
-			#end if
-		#end for
-		Msg = \
-			(
-				("", "Successfully loaded: ")[len(Succeeded) != 0]
-			+
-				", ".join(Succeeded)
-			+
-				("", "; ")[len(Succeeded) != 0 and len(Failed) != 0]
-			+
-				("", "Failed to load: ")[len(Failed) != 0]
-			+
-				", ".join(Failed)
-			+
-				("", ".")[len(Succeeded) != 0 or len(Failed) != 0]
-			)
-		MsgAlert(Msg, gtk.MESSAGE_INFO)
-	except Failure, Reason :
-		ErrorAlert(Reason.Msg)
-	#end try
+    """reloads the colour palettes from a previously-saved menu XML file."""
+    try :
+        try :
+            MenuContents = XMLElementTree.parse(MenuFileName)
+        except ExpatError :
+            raise Failure("Not a valid XML file.")
+        #end try
+        FindTag = MenuContents.getroot()
+        if FindTag != None :
+            FindTag = FindTag.find("stream")
+        #end if
+        if FindTag != None :
+            FindTag = FindTag.find("spu")
+        #end if
+        if FindTag == None :
+            raise Failure("can't make sense of contents of menu XML file")
+        #end if
+        Succeeded = []
+        Failed = []
+        for \
+            Description, Attr, ColorList \
+        in \
+            (
+                ("normal", "image", MainWindow.ColorsNormalList),
+                ("highlighted", "highlight", MainWindow.ColorsHighlightedList),
+                ("selected", "select", MainWindow.ColorsSelectedList),
+            ) \
+        :
+            ImageName = FindTag.get(Attr)
+            if ImageName != None :
+                try :
+                    if not ImageName.startswith("/") :
+                        ImageName = os.path.join(os.path.dirname(MenuFileName), ImageName)
+                    #end if
+                    try :
+                        ImageFile = open(ImageName, "r")
+                    except IOError :
+                        raise Failure("couldn't open %s" % ImageName)
+                    #end try
+                    try :
+                        Colors = spuhelper.read_png_palette(ImageFile)
+                    except RuntimeError :
+                        raise Failure("couldn't make sense of %s" % ImageName)
+                    #end try
+                    if Colors == None :
+                        raise Failure("no palette in PNG file %s" % ImageName)
+                    #end if
+                    for i, Color in enumerate(Colors[:4]) :
+                        ColorList.set_value(ColorList.get_iter((i,)), 0, Color)
+                    #end for
+                    Succeeded.append(Description)
+                except Failure :
+                    Failed.append(ImageName)
+                #end try
+            #end if
+        #end for
+        Msg = \
+            (
+                ("", "Successfully loaded: ")[len(Succeeded) != 0]
+            +
+                ", ".join(Succeeded)
+            +
+                ("", "; ")[len(Succeeded) != 0 and len(Failed) != 0]
+            +
+                ("", "Failed to load: ")[len(Failed) != 0]
+            +
+                ", ".join(Failed)
+            +
+                ("", ".")[len(Succeeded) != 0 or len(Failed) != 0]
+            )
+        MsgAlert(Msg, gtk.MESSAGE_INFO)
+    except Failure, Reason :
+        ErrorAlert(Reason.Msg)
+    #end try
 #end LoadSavedColors
 
 def FindButtons() :
-	"""finds all button definitions in the selected button layer."""
-	TheLayer = None # initial assumption
-	SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
-	if SelectedLayerID != None :
-		for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
-			if Layer.get("id") == SelectedLayerID :
-				TheLayer = Layer
-				break
-			#end if
-		#end for
-	#end if
-	MainWindow.ButtonList.clear()
-	if TheLayer != None :
-		for Button in TheLayer.findall("{%s}rect" % ns.svg) :
-			ButtonName = Button.get("id")
-			ButtonInfo = \
-				{
-					"bounds" :
-						(
-							float(Button.get("x")),
-							float(Button.get("y")),
-							float(Button.get("width")),
-							float(Button.get("height")),
-						),
-				}
-			Desc = Button.find("{%s}desc" % ns.svg)
-			if Desc != None :
-				for Entry in Desc.text.split("\n") :
-					Entry = Entry.split("=", 1)
-					if len(Entry) == 2 :
-						Key, Value = Entry
-						if Key == "action" :
-							ButtonInfo["auto"] = Value == "auto"
-						elif Key in ("up", "down", "left", "right") :
-							ButtonInfo[Key] = Value
-						#end if
-					#end if
-				#end for
-			#end if
-			MainWindow.ButtonList.append((ButtonName, ButtonInfo))
-		#end for
-	#end if
+    """finds all button definitions in the selected button layer."""
+    TheLayer = None # initial assumption
+    SelectedLayerID = GetSingleListSelection(MainWindow.LayerDisplay, 1)
+    if SelectedLayerID != None :
+        for Layer in LoadedImage.Contents.findall("{%s}g" % ns.svg) :
+            if Layer.get("id") == SelectedLayerID :
+                TheLayer = Layer
+                break
+            #end if
+        #end for
+    #end if
+    MainWindow.ButtonList.clear()
+    if TheLayer != None :
+        for Button in TheLayer.findall("{%s}rect" % ns.svg) :
+            ButtonName = Button.get("id")
+            ButtonInfo = \
+                {
+                    "bounds" :
+                        (
+                            float(Button.get("x")),
+                            float(Button.get("y")),
+                            float(Button.get("width")),
+                            float(Button.get("height")),
+                        ),
+                }
+            Desc = Button.find("{%s}desc" % ns.svg)
+            if Desc != None :
+                for Entry in Desc.text.split("\n") :
+                    Entry = Entry.split("=", 1)
+                    if len(Entry) == 2 :
+                        Key, Value = Entry
+                        if Key == "action" :
+                            ButtonInfo["auto"] = Value == "auto"
+                        elif Key in ("up", "down", "left", "right") :
+                            ButtonInfo[Key] = Value
+                        #end if
+                    #end if
+                #end for
+            #end if
+            MainWindow.ButtonList.append((ButtonName, ButtonInfo))
+        #end for
+    #end if
 #end FindButtons()
 
 #+
@@ -1067,761 +1067,761 @@ def FindButtons() :
 #-
 
 def DestroyWindow(TheWindow) :
-	# called when main window's close box is clicked.
-	gtk.main_quit()
+    # called when main window's close box is clicked.
+    gtk.main_quit()
 #end DestroyWindow
 
 def SelectLoadMenuImage(TheWindow) :
-	# lets the user choose an SVG file to load for the menu image.
-	ImageFileName = ChooseOpenFile \
-	  (
-		Prompt = "Choose SVG Image for Menu",
-		Filters = (("SVG Files", ("*.svg",)),)
-	  )
-	if ImageFileName != None :
-		LoadMenuImage(ImageFileName)
-	#end if
+    # lets the user choose an SVG file to load for the menu image.
+    ImageFileName = ChooseOpenFile \
+      (
+        Prompt = "Choose SVG Image for Menu",
+        Filters = (("SVG Files", ("*.svg",)),)
+      )
+    if ImageFileName != None :
+        LoadMenuImage(ImageFileName)
+    #end if
 #end SelectLoadMenuImage
 
 def SelectLoadBackgroundImage(TheWindow) :
-	# lets the user choose a JPEG or PNG file to load for the background image.
-	if LoadedImage.Contents == None :
-		ErrorAlert("Load the menu image first.")
-		  # because I'm not currently showing the background otherwise
-	else :
-		ImageFileName = ChooseOpenFile \
-		  (
-			Prompt = "Choose JPEG or PNG Image for Background",
-			Filters =
-				(
-					("JPEG Files", ("*.jpg", "*.jpeg")),
-					("PNG Files", ("*.png",)),
-				)
-		  )
-		if ImageFileName != None :
-			LoadBackgroundImage(ImageFileName)
-		#end if
-	#end if
+    # lets the user choose a JPEG or PNG file to load for the background image.
+    if LoadedImage.Contents == None :
+        ErrorAlert("Load the menu image first.")
+          # because I'm not currently showing the background otherwise
+    else :
+        ImageFileName = ChooseOpenFile \
+          (
+            Prompt = "Choose JPEG or PNG Image for Background",
+            Filters =
+                (
+                    ("JPEG Files", ("*.jpg", "*.jpeg")),
+                    ("PNG Files", ("*.png",)),
+                )
+          )
+        if ImageFileName != None :
+            LoadBackgroundImage(ImageFileName)
+        #end if
+    #end if
 #end SelectLoadBackgroundImage
 
 def SelectLoadColors(TheWindow) :
-	# lets the user choose a palette file of colours to choose from.
-	PaletteFileName = ChooseOpenFile \
-	  (
-		Prompt = "Choose Palette File to Load",
-		Filters = (("GIMP Palette Files", ("*.gpl",)),)
-	  )
-	if PaletteFileName != None :
-		LoadColors(PaletteFileName)
-	#end if
+    # lets the user choose a palette file of colours to choose from.
+    PaletteFileName = ChooseOpenFile \
+      (
+        Prompt = "Choose Palette File to Load",
+        Filters = (("GIMP Palette Files", ("*.gpl",)),)
+      )
+    if PaletteFileName != None :
+        LoadColors(PaletteFileName)
+    #end if
 #end SelectLoadColors
 
 def SelectLoadSavedColors(TheWindow) :
-	# lets the user choose a previously-saved menu XML file from which to reload
-	# the colour palettes.
-	MenuFileName = ChooseOpenFile \
-	  (
-		Prompt = "Choose Previously-Saved Menu File to Load",
-		Filters = (("XML Files", ("*.xml",)),)
-	  )
-	if MenuFileName != None :
-		LoadSavedColors(MenuFileName)
-	#end if
+    # lets the user choose a previously-saved menu XML file from which to reload
+    # the colour palettes.
+    MenuFileName = ChooseOpenFile \
+      (
+        Prompt = "Choose Previously-Saved Menu File to Load",
+        Filters = (("XML Files", ("*.xml",)),)
+      )
+    if MenuFileName != None :
+        LoadSavedColors(MenuFileName)
+    #end if
 #end SelectLoadSavedColors
 
 def LayerSelectionChanged(TheSelection) :
-	# called on a change to the selection of the button layer.
-	ForgetButtonBlink()
-	FindButtons()
-	AnalyzeImage()
-	DisplayImage()
+    # called on a change to the selection of the button layer.
+    ForgetButtonBlink()
+    FindButtons()
+    AnalyzeImage()
+    DisplayImage()
 #end LayerSelectionChanged
 
 def ColorDisplayChanged(TheButton, Index) :
-	if not MainWindow.Loading and TheButton.get_active() :
-		LoadedImage.ColorShowing = Index
-		ForgetButtonBlink()
-		DisplayImage()
-	#end if
+    if not MainWindow.Loading and TheButton.get_active() :
+        LoadedImage.ColorShowing = Index
+        ForgetButtonBlink()
+        DisplayImage()
+    #end if
 #end ColorDisplayChanged
 
 def EditColor(TreeView, ColorPath, ViewColumn) :
-	# called when an item in a colour list is double-clicked.
-	ForgetButtonBlink()
-	if ColorPath[0] < 4 : # excess colours won't be saved anyway
-		ColorList = TreeView.get_model()
-		TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
-		ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
-		Chooser = ChooseNewColor.get_color_selection()
-		Chooser.set_has_opacity_control(True)
-		if TheColor[3] != 0 : # convert from premultiplied alpha
-			Chooser.set_current_color \
-			  (
-				gtk.gdk.Color(*(i * 65535 // TheColor[3] for i in TheColor[:3]))
-			  )
-			Chooser.set_current_alpha(TheColor[3] * 257)
-		else :
-			Chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
-			Chooser.set_current_alpha(0)
-		#end if
-		Response = ChooseNewColor.run()
-		if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
-			NewColor = Chooser.get_current_color()
-			Opacity = Chooser.get_current_alpha() >> 8
-			NewColor = \
-				( # convert to premultiplied alpha
-					NewColor.red // 257 * Opacity // 255,
-					NewColor.green // 257 * Opacity // 255,
-					NewColor.blue // 257 * Opacity // 255,
-					Opacity,
-				)
-			ColorList.set_value(ColorList.get_iter(ColorPath), 0, NewColor)
-			DisplayImage()
-		#end if
-		ChooseNewColor.destroy()
-	#end if
+    # called when an item in a colour list is double-clicked.
+    ForgetButtonBlink()
+    if ColorPath[0] < 4 : # excess colours won't be saved anyway
+        ColorList = TreeView.get_model()
+        TheColor = ColorList.get_value(ColorList.get_iter(ColorPath), 0)
+        ChooseNewColor = gtk.ColorSelectionDialog("Choose a colour, any colour")
+        Chooser = ChooseNewColor.get_color_selection()
+        Chooser.set_has_opacity_control(True)
+        if TheColor[3] != 0 : # convert from premultiplied alpha
+            Chooser.set_current_color \
+              (
+                gtk.gdk.Color(*(i * 65535 // TheColor[3] for i in TheColor[:3]))
+              )
+            Chooser.set_current_alpha(TheColor[3] * 257)
+        else :
+            Chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
+            Chooser.set_current_alpha(0)
+        #end if
+        Response = ChooseNewColor.run()
+        if Response == ChooseNewColor.get_response_for_widget(ChooseNewColor.ok_button) :
+            NewColor = Chooser.get_current_color()
+            Opacity = Chooser.get_current_alpha() >> 8
+            NewColor = \
+                ( # convert to premultiplied alpha
+                    NewColor.red // 257 * Opacity // 255,
+                    NewColor.green // 257 * Opacity // 255,
+                    NewColor.blue // 257 * Opacity // 255,
+                    Opacity,
+                )
+            ColorList.set_value(ColorList.get_iter(ColorPath), 0, NewColor)
+            DisplayImage()
+        #end if
+        ChooseNewColor.destroy()
+    #end if
 #end EditColor
 
 def DragGetColor(ColorList, DragContext, SelectionData, InfoID, TimeStamp) :
-	# called on a drag to retrieve the colour spec from the drag source.
-	TheColor = GetSingleListSelection(ColorList, 0)
-	if TheColor != None :
-		TheColor = ",".join(str(i) for i in TheColor)
-	else :
-		TheColor = ""
-	#end if
-	SelectionData.set_text(TheColor, -1)
+    # called on a drag to retrieve the colour spec from the drag source.
+    TheColor = GetSingleListSelection(ColorList, 0)
+    if TheColor != None :
+        TheColor = ",".join(str(i) for i in TheColor)
+    else :
+        TheColor = ""
+    #end if
+    SelectionData.set_text(TheColor, -1)
 #end DragGetColor
 
 def DragSetColor(ColorList, DragContext, DropX, DropY, SelectionData, InfoID, TimeStamp) :
-	# called on a drag to save the colour spec into the drag destination.
-	DropY -= ColorList.get_cell_area((0,), ColorList.get_column(0)).height
-	  # FUDGE: GTK bug? seems to pass Y-coordinate from top of column heading,
-	  # not from top of first cell
-	TheColor = SelectionData.get_text()
-	ThePath = ColorList.get_path_at_pos(DropX, DropY)
-	if ThePath != None and TheColor != "" :
-		ThePath = ThePath[0]
-		if ThePath[0] < 4 :
-			ListModel = ColorList.get_model()
-			TheRow = ListModel.get_iter(ThePath)
-			TheColor = tuple(int(i) for i in TheColor.split(","))
-			if len(TheColor) < 4 :
-				# no new opacity, preserve existing setting
-				TheColor = TheColor + (ListModel.get_value(TheRow, 0)[3],)
-			#end if
-			ListModel.set_value(TheRow, 0, TheColor)
-			DisplayImage()
-		#end if
-	#end if
+    # called on a drag to save the colour spec into the drag destination.
+    DropY -= ColorList.get_cell_area((0,), ColorList.get_column(0)).height
+      # FUDGE: GTK bug? seems to pass Y-coordinate from top of column heading,
+      # not from top of first cell
+    TheColor = SelectionData.get_text()
+    ThePath = ColorList.get_path_at_pos(DropX, DropY)
+    if ThePath != None and TheColor != "" :
+        ThePath = ThePath[0]
+        if ThePath[0] < 4 :
+            ListModel = ColorList.get_model()
+            TheRow = ListModel.get_iter(ThePath)
+            TheColor = tuple(int(i) for i in TheColor.split(","))
+            if len(TheColor) < 4 :
+                # no new opacity, preserve existing setting
+                TheColor = TheColor + (ListModel.get_value(TheRow, 0)[3],)
+            #end if
+            ListModel.set_value(TheRow, 0, TheColor)
+            DisplayImage()
+        #end if
+    #end if
 #end DragSetColor
 
 def ButtonSelectionDone() :
-	# timeout callback to turn off display of button in selected state
-	MainWindow.ButtonBlinkTask = None
-	MainWindow.ButtonSelected = False
-	DisplayImage()
-	return False # one-off invocation
+    # timeout callback to turn off display of button in selected state
+    MainWindow.ButtonBlinkTask = None
+    MainWindow.ButtonSelected = False
+    DisplayImage()
+    return False # one-off invocation
 #end ButtonSelectionDone
 
 def ImageClickEvent(TheWidget, TheEvent) :
-	Handled = False
-	if LoadedImage.ColorShowing == 4 :
-		if TheEvent.type == gtk.gdk.BUTTON_PRESS :
-			MainWindow.ImageClick.grab_focus()
-		elif TheEvent.type == gtk.gdk.BUTTON_RELEASE :
-			pass
-			# Handled = True
-		elif TheEvent.type == gtk.gdk.FOCUS_CHANGE :
-			if not TheEvent.in_ :
-				ForgetButtonBlink()
-				if MainWindow.ButtonHighlight != None :
-					MainWindow.ButtonHighlight = None
-					DisplayImage()
-				#end if
-			#end if
-			# Handled = True
-		elif TheEvent.type == gtk.gdk.KEY_PRESS :
-			if False :
-				sys.stderr.write \
-				  (
-					"key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
-				  ) # debug
-			#end if
-			Navigation = \
-				{
-					keyval.upkey : "up",
-					keyval.downkey : "down",
-					keyval.leftkey : "left",
-					keyval.rightkey : "right",
-				}
-			if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
-				BlinkHighlightedButton()
-			elif TheEvent.keyval in Navigation and MainWindow.ButtonHighlight != None :
-				NextButtonID = MainWindow.ButtonHighlight.get(Navigation[TheEvent.keyval])
-				NextButton = None
-				if NextButtonID != None :
-					for Button in iter(MainWindow.ButtonList) :
-						if Button[0] == NextButtonID :
-							NextButton = Button
-						#end if
-					#end for
-				#end if
-				if NextButton != None :
-					ForgetButtonBlink()
-					MainWindow.ButtonHighlight = NextButton[1]
-					MainWindow.ButtonHighlightRect = MapButton \
-					  (
-						Bounds = NextButton[1]["bounds"],
-						SrcDimensions = LoadedImage.SrcDimensions,
-						DstDimensions = LoadedImage.ImageDrawSize
-					  )
-					DisplayImage()
-				#end if
-			#end if
-			Handled = True
-		#end if
-		if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
-			# do buttons in reverse order to pick up topmost one
-			ButtonIndex = len(MainWindow.ButtonList)
-			while True :
-				if ButtonIndex == 0 :
-					ThisButton = None
-					break
-				#end if
-				ButtonIndex -= 1
-				ThisButton = MainWindow.ButtonList[ButtonIndex][1]
-				Bounds = ThisButton["bounds"]
-				Bounds = MapButton \
-				  (
-					Bounds = Bounds,
-					SrcDimensions = LoadedImage.SrcDimensions,
-					DstDimensions = LoadedImage.ImageDrawSize
-				  )
-				if (
-						TheEvent.x >= Bounds[0]
-					and
-						TheEvent.x < Bounds[0] + Bounds[2]
-					and
-						TheEvent.y >= Bounds[1]
-					and
-						TheEvent.y < Bounds[1] + Bounds[3]
-				) :
-					break
-				#end if
-			#end while
-			if ThisButton != MainWindow.ButtonHighlight :
-				ForgetButtonBlink()
-				MainWindow.ButtonHighlight = ThisButton
-				MainWindow.ButtonHighlightRect = Bounds
-				DisplayImage()
-			#end if
-			# Handled = True
-		#end if
-		if TheEvent.type == gtk.gdk._2BUTTON_PRESS :
-			if MainWindow.ButtonHighlight != None :
-				BlinkHighlightedButton()
-			#end if
-			# Handled = True
-		#end if
-	#end if
-	return Handled
+    Handled = False
+    if LoadedImage.ColorShowing == 4 :
+        if TheEvent.type == gtk.gdk.BUTTON_PRESS :
+            MainWindow.ImageClick.grab_focus()
+        elif TheEvent.type == gtk.gdk.BUTTON_RELEASE :
+            pass
+            # Handled = True
+        elif TheEvent.type == gtk.gdk.FOCUS_CHANGE :
+            if not TheEvent.in_ :
+                ForgetButtonBlink()
+                if MainWindow.ButtonHighlight != None :
+                    MainWindow.ButtonHighlight = None
+                    DisplayImage()
+                #end if
+            #end if
+            # Handled = True
+        elif TheEvent.type == gtk.gdk.KEY_PRESS :
+            if False :
+                sys.stderr.write \
+                  (
+                    "key press state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+                  ) # debug
+            #end if
+            Navigation = \
+                {
+                    keyval.upkey : "up",
+                    keyval.downkey : "down",
+                    keyval.leftkey : "left",
+                    keyval.rightkey : "right",
+                }
+            if TheEvent.keyval in (keyval.returnkey, keyval.enterkey) :
+                BlinkHighlightedButton()
+            elif TheEvent.keyval in Navigation and MainWindow.ButtonHighlight != None :
+                NextButtonID = MainWindow.ButtonHighlight.get(Navigation[TheEvent.keyval])
+                NextButton = None
+                if NextButtonID != None :
+                    for Button in iter(MainWindow.ButtonList) :
+                        if Button[0] == NextButtonID :
+                            NextButton = Button
+                        #end if
+                    #end for
+                #end if
+                if NextButton != None :
+                    ForgetButtonBlink()
+                    MainWindow.ButtonHighlight = NextButton[1]
+                    MainWindow.ButtonHighlightRect = MapButton \
+                      (
+                        Bounds = NextButton[1]["bounds"],
+                        SrcDimensions = LoadedImage.SrcDimensions,
+                        DstDimensions = LoadedImage.ImageDrawSize
+                      )
+                    DisplayImage()
+                #end if
+            #end if
+            Handled = True
+        #end if
+        if TheEvent.type == gtk.gdk.BUTTON_PRESS or TheEvent.type == gtk.gdk.MOTION_NOTIFY :
+            # do buttons in reverse order to pick up topmost one
+            ButtonIndex = len(MainWindow.ButtonList)
+            while True :
+                if ButtonIndex == 0 :
+                    ThisButton = None
+                    break
+                #end if
+                ButtonIndex -= 1
+                ThisButton = MainWindow.ButtonList[ButtonIndex][1]
+                Bounds = ThisButton["bounds"]
+                Bounds = MapButton \
+                  (
+                    Bounds = Bounds,
+                    SrcDimensions = LoadedImage.SrcDimensions,
+                    DstDimensions = LoadedImage.ImageDrawSize
+                  )
+                if (
+                        TheEvent.x >= Bounds[0]
+                    and
+                        TheEvent.x < Bounds[0] + Bounds[2]
+                    and
+                        TheEvent.y >= Bounds[1]
+                    and
+                        TheEvent.y < Bounds[1] + Bounds[3]
+                ) :
+                    break
+                #end if
+            #end while
+            if ThisButton != MainWindow.ButtonHighlight :
+                ForgetButtonBlink()
+                MainWindow.ButtonHighlight = ThisButton
+                MainWindow.ButtonHighlightRect = Bounds
+                DisplayImage()
+            #end if
+            # Handled = True
+        #end if
+        if TheEvent.type == gtk.gdk._2BUTTON_PRESS :
+            if MainWindow.ButtonHighlight != None :
+                BlinkHighlightedButton()
+            #end if
+            # Handled = True
+        #end if
+    #end if
+    return Handled
 #end ImageClickEvent
 
 def SelectSaveMenu(TheWindow) :
-	# lets the user specify a file name for saving the completely-built
-	# spumux control file and associated menu image files.
+    # lets the user specify a file name for saving the completely-built
+    # spumux control file and associated menu image files.
 
-	TheDialog = None
-	NormalLabelStyle = None
-	DimmedLabelStyle = None
-	NameLabels = {}
-	ExtraFileNames = {}
-	SelectedAspects = [None, None]
-	GenerateMenu = [True, True] # whether to generate narrowscreen and widescreen versions of menu
-	class Context :
-		SynchronizeTask = None
-	#end Context
+    TheDialog = None
+    NormalLabelStyle = None
+    DimmedLabelStyle = None
+    NameLabels = {}
+    ExtraFileNames = {}
+    SelectedAspects = [None, None]
+    GenerateMenu = [True, True] # whether to generate narrowscreen and widescreen versions of menu
+    class Context :
+        SynchronizeTask = None
+    #end Context
 
-	def SelectedAspectToggled(TheButton, Which) :
-		GenerateMenu[Which] = TheButton.get_active()
-		for \
-			Suffix \
-		in \
-			(
-				((), ("letterbox",))[ExtraFileNames.has_key("letterbox") and Which]
-			+
-				tuple(s + ("", "-letterboxed")[Which] for s in ("normal", "highlighted", "selected"))
-			) \
-		:
-			for NameLabel in (ExtraFileNames[Suffix], NameLabels[Suffix]) :
-				NameLabel.modify_style((DimmedLabelStyle, NormalLabelStyle)[GenerateMenu[Which]])
-			#end for
-		#end for
-	#end SelectedAspectToggled
+    def SelectedAspectToggled(TheButton, Which) :
+        GenerateMenu[Which] = TheButton.get_active()
+        for \
+            Suffix \
+        in \
+            (
+                ((), ("letterbox",))[ExtraFileNames.has_key("letterbox") and Which]
+            +
+                tuple(s + ("", "-letterboxed")[Which] for s in ("normal", "highlighted", "selected"))
+            ) \
+        :
+            for NameLabel in (ExtraFileNames[Suffix], NameLabels[Suffix]) :
+                NameLabel.modify_style((DimmedLabelStyle, NormalLabelStyle)[GenerateMenu[Which]])
+            #end for
+        #end for
+    #end SelectedAspectToggled
 
-	def SynchronizeNames(BaseFileName) :
-		# synchronizes all automatically-generated file names with the one
-		# manually typed by the user.
-		if BaseFileName == None :
-			BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
-		#end if
-		if ExtraFileNames.has_key("letterbox") :
-			ExtraFileNames["letterbox"].set_text("%s-letterboxed.xml" % (BaseFileName,))
-			for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
-				ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
-			#end for
-		#end if
-		for Suffix in ("normal", "highlighted", "selected") :
-			ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
-		#end for
-		return False # one-off timeout invocation
-	#end SynchronizeNames
+    def SynchronizeNames(BaseFileName) :
+        # synchronizes all automatically-generated file names with the one
+        # manually typed by the user.
+        if BaseFileName == None :
+            BaseFileName = os.path.splitext(os.path.basename(TheDialog.get_filename()))[0]
+        #end if
+        if ExtraFileNames.has_key("letterbox") :
+            ExtraFileNames["letterbox"].set_text("%s-letterboxed.xml" % (BaseFileName,))
+            for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
+                ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
+            #end for
+        #end if
+        for Suffix in ("normal", "highlighted", "selected") :
+            ExtraFileNames[Suffix].set_text("%s-%s.png" % (BaseFileName, Suffix))
+        #end for
+        return False # one-off timeout invocation
+    #end SynchronizeNames
 
-	def ForgetSynchronize() :
-		# loses the synchronization task, if it hasn't triggered yet
-		if Context.SynchronizeTask != None :
-			glib.source_remove(Context.SynchronizeTask)
-			Context.SynchronizeTask = None
-		#end if
-	#end ForgetSynchronize
+    def ForgetSynchronize() :
+        # loses the synchronization task, if it hasn't triggered yet
+        if Context.SynchronizeTask != None :
+            glib.source_remove(Context.SynchronizeTask)
+            Context.SynchronizeTask = None
+        #end if
+    #end ForgetSynchronize
 
-	def SaveKeyPress(TheWidget, TheEvent) :
-		# intercepts user text entry for the saved filename to keep the
-		# other generated filenames in sync.
-		if TheEvent.type == gtk.gdk.KEY_PRESS :
-			if False :
-				sys.stderr.write \
-				  (
-					"SaveKeyPress state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
-				  ) # debug
-			#end if
-			# Need to call SynchronizeNames _after_ the file chooser has processed this
-			# keystroke. Only I way I can think of to get control at that point is by
-			# a delayed task.
-			ForgetSynchronize()
-			Context.SynchronizeTask = glib.timeout_add \
-			  (
-				int(round(0.1 * 1000)),
-				SynchronizeNames,
-				None
-			  )
-		#end if
-	#end SaveKeyPress
+    def SaveKeyPress(TheWidget, TheEvent) :
+        # intercepts user text entry for the saved filename to keep the
+        # other generated filenames in sync.
+        if TheEvent.type == gtk.gdk.KEY_PRESS :
+            if False :
+                sys.stderr.write \
+                  (
+                    "SaveKeyPress state = %d, val = %s\n" % (TheEvent.state, repr(TheEvent.keyval))
+                  ) # debug
+            #end if
+            # Need to call SynchronizeNames _after_ the file chooser has processed this
+            # keystroke. Only I way I can think of to get control at that point is by
+            # a delayed task.
+            ForgetSynchronize()
+            Context.SynchronizeTask = glib.timeout_add \
+              (
+                int(round(0.1 * 1000)),
+                SynchronizeNames,
+                None
+              )
+        #end if
+    #end SaveKeyPress
 
 #begin SelectSaveMenu
-	if LoadedImage.Contents != None :
-		TheDialog = gtk.FileChooserDialog \
-		  (
-			title = "Save Menu As:",
-			action = gtk.FILE_CHOOSER_ACTION_SAVE,
-			buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
-		  )
-		ExtraBox = gtk.Table \
-		  (
-			rows = (4, 9)[LoadedImage.Widescreen],
-			columns = 4, # extra columns just to get cell sizes looking right
-			homogeneous = True
-		  )
-		FormatRow = (3, 9)[LoadedImage.Widescreen]
-		if LoadedImage.Widescreen :
-			# allow user to save 2 separate menu XML files with associated
-			# image files, one which displays full-height on all screens and
-			# one which displays letterboxed on 4:3 screens
-			ExtraNamesPrompts = \
-				{
-					"normal" : "Normal Image (Full-Height): ",
-					"highlighted" : "Highlighted Image (Full-Height): ",
-					"selected" : "Selected Image (Full-Height): ",
-					"letterbox" : "Letterboxed Menu: ",
-					"normal-letterboxed" : "Normal Image (Letterboxed): ",
-					"highlighted-letterboxed" : "Highlighted Image (Letterboxed): ",
-					"selected-letterboxed" : "Selected Image (Letterboxed): ",
-				}
-			SelectedAspects[False] = gtk.CheckButton("Save Full-Height Version")
-			SelectedAspects[False].set_active(True) # not default
-			SelectedAspects[False].connect("toggled", SelectedAspectToggled, False)
-			SelectedAspects[True] = gtk.CheckButton("Save Letterboxed Version")
-			SelectedAspects[True].set_active(True) # not default
-			SelectedAspects[True].connect("toggled", SelectedAspectToggled, True)
-			ExtraBox.attach \
-			  (
-				SelectedAspects[False],
-				0, 2, 0, 1
-			  )
-			ExtraBox.attach \
-			  (
-				SelectedAspects[True],
-				0, 2, 4, 5
-			  )
-		else :
-			ExtraNamesPrompts = \
-				{
-					"normal" : "Normal Image: ",
-					"highlighted" : "Highlighted Image: ",
-					"selected" : "Selected Image: ",
-				}
-		#end if
-		for \
-				Row, Suffix \
-			in \
-				enumerate \
-				  (
-						(
-							(),
-							(None,), # checkbox goes here (above)
-						)[LoadedImage.Widescreen]
-					+
-						("normal", "highlighted", "selected")
-					+
-						(
-							(),
-							(
-								None, # checkbox goes here (above)
-								"letterbox",
-								"normal-letterboxed",
-								"highlighted-letterboxed",
-								"selected-letterboxed",
-							)
-						)[LoadedImage.Widescreen]
-				  ) \
-		:
-			if Suffix != None :
-				NameLabels[Suffix] = gtk.Label(ExtraNamesPrompts[Suffix])
-				NameLabels[Suffix].set_alignment(0, 0.5)
-				ExtraBox.attach \
-				  (
-					NameLabels[Suffix],
-					0, 1, Row, Row + 1
-				  )
-				ExtraFileNames[Suffix] = gtk.Label()
-				ExtraFileNames[Suffix].set_alignment(0, 0.5)
-				if NormalLabelStyle == None :
-					ExtraFileNames[Suffix].ensure_style()
-					NormalLabelStyle = ExtraFileNames[Suffix].get_style()
-				#end if
-				ExtraBox.attach \
-				  (
-					ExtraFileNames[Suffix],
-					1, 2, Row, Row + 1
-				  )
-			#end if
-		#end if
-		DimmedLabelStyle = gtk.RcStyle()
-		for State in (gtk.STATE_NORMAL,) : # no need for gtk.STATE_INSENSITIVE
-			DimmedLabelStyle.fg[State] = gtk.gdk.color_from_hsv \
-			  (
-				hue = NormalLabelStyle.fg[State].hue,
-				saturation = NormalLabelStyle.fg[State].saturation / 2,
-				value = 1.0 - (1.0 - NormalLabelStyle.fg[State].value) / 2
-			  )
-		#end if
-		NormalLabelStyle = gtk.RcStyle() # with no customizations
-		NameLabel = gtk.Label("Video Format: ")
-		NameLabel.set_alignment(0, 0.5)
-		ExtraBox.attach \
-		  (
-			NameLabel,
-			0, 1, FormatRow, FormatRow + 1
-		  )
-		FormatSelector = gtk.combo_box_new_text()
-		default_video_format = get_default_video_format()
-		for i, video_format in enumerate(sorted(valid_video_formats)) :
-			FormatSelector.append_text(video_format)
-			if video_format == default_video_format :
-				FormatSelector.set_active(i)
-			#end if
-		#end for
-		ExtraBox.attach \
-		  (
-			FormatSelector,
-			1, 2, FormatRow, FormatRow + 1
-		  )
-		ExtraBox.show_all()
-		TheDialog.set_extra_widget(ExtraBox)
-		TheDialog.connect("key-press-event", SaveKeyPress)
-		BaseFileName = os.path.splitext(os.path.basename(LoadedImage.FileName))[0]
-		TheDialog.set_current_name(BaseFileName + ".xml")
-		SynchronizeNames(BaseFileName)
-		  # need to pass BaseFileName because TheDialog.get_filename() returns None at this point
-		MenuFileNames = [None, None]
-		GenerateMenu[True] = LoadedImage.Widescreen
-		while True :
-			Response = TheDialog.run()
-			ForgetSynchronize()
-			if Response != gtk.RESPONSE_OK :
-				break
-			#end if
-			SynchronizeNames(None)
-			try : # validate user selection
-				if not (GenerateMenu[False] or GenerateMenu[True]) :
-					raise Failure("Nothing to do!")
-				#end if
-				VideoFormat = FormatSelector.get_active_text()
-				if VideoFormat not in ("NTSC", "PAL") :
-					raise Failure("You must choose a video format.")
-				#end if
-				ParentDir = os.path.dirname(TheDialog.get_filename())
-				ImageNames = {}
-				if GenerateMenu[False] :
-					MenuFileNames[False] = TheDialog.get_filename()
-					for Suffix in ("normal", "highlighted", "selected") :
-						ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
-					#end for
-				#end if
-				if GenerateMenu[True] :
-					MenuFileNames[True] = os.path.join \
-					  (
-						ParentDir,
-						ExtraFileNames["letterbox"].get_text()
-					  )
-					for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
-						ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
-					#end for
-				#end if
-				Overwriting = list \
-				  (
-					os.path.basename(f)
-						for f in tuple(MenuFileNames) + tuple(ImageNames.values())
-						if f != None and os.path.exists(f)
-				  )
-				if len(Overwriting) == 0 :
-					break
-				ConfirmDialog = gtk.MessageDialog \
-				  (
-					flags = gtk.DIALOG_MODAL,
-					buttons = gtk.BUTTONS_OK_CANCEL,
-					type = gtk.MESSAGE_QUESTION,
-					message_format =
-						"File(s) already exist: %s. Overwrite?" % ", ".join(Overwriting)
-				  )
-				Response = ConfirmDialog.run()
-				ConfirmDialog.destroy()
-				if Response == gtk.RESPONSE_OK :
-					break
-			except Failure, Reason :
-				ErrorAlert(Reason.Msg)
-				# and keep prompting user for save filenames
-			#end try
-		#end while
-		TheDialog.destroy()
-		FillColor = LoadedImage.Colors[0][0] # so leftover pixels get most popular colour
-		# convert native-endian Cairo format
-		if sys.byteorder == "big" :
-			FillColor = (FillColor[3], FillColor[0], FillColor[1], FillColor[2])
-		else :
-			FillColor = (FillColor[2], FillColor[1], FillColor[0], FillColor[3])
-		#end if
-		if MenuFileNames[False] != None :
-			ImageBounds = {"NTSC" : (720, 480), "PAL" : (720, 576)}[VideoFormat]
-			ReferenceScale = ((4, 3), (16, 9))[LoadedImage.Widescreen]
-			ImageRefHeight = ImageBounds[0] / ReferenceScale[0] * ReferenceScale[1]
-			  # image height if pixels were square
-			ImageRowStride = ImageBounds[0] * 4 # fixme: use format_stride_for_width
-			Letterboxed = False # which version of menu I'm generating
-			while True : # write menu XML file(s) and associated image files
-				if GenerateMenu[Letterboxed] :
-					RGBPixels = array.array \
-					  (
-						"B",
-							(0, 0, 0, 0) # for correct treatment of non-opaque image pixels
-						*
-							(ImageRowStride // 4 * ImageBounds[1])
-					  )
-					RGBPix = cairo.ImageSurface.create_for_data \
-					  (
-						RGBPixels, # data
-						cairo.FORMAT_ARGB32, # format
-						ImageBounds[0], # width
-						ImageBounds[1], # height
-						ImageRowStride # stride
-					  )
-					RGBRender = cairo.Context(RGBPix)
-					FitFactor = min \
-					  (
-						ImageBounds[0] / LoadedImage.SrcDimensions[0],
-						ImageRefHeight / LoadedImage.SrcDimensions[1],
-					  ) # make sure it's all visible
-					RGBRender.set_matrix \
-					  (
-						ToCairo
-						  (
-							Matrix.scaling(Point
-							  (
-								FitFactor,
-								ImageBounds[1] / ImageRefHeight * FitFactor
-							  ))
-						  )
-					  )
-					svg = rsvg.Handle(data = ImageAsSVG())
-					svg.render_cairo(RGBRender)
-					RGBPix.flush()
-					if Letterboxed :
-						# squeeze menu image down to letterboxed height
-						HeightMid = ImageBounds[1] / 2
-						HalfHeight = ImageBounds[1] / 2 * (9 / 16) / (3 / 4)
-						MenuBounds = \
-							(
-								0,
-								HeightMid - HalfHeight,
-								ImageBounds[0],
-								2 * HalfHeight
-							)
-						ToMiddle = Point(0, HeightMid)
-						NewRenderPixels = array.array \
-						  (
-							"B",
-								FillColor
-							*
-								(ImageRowStride // 4 * ImageBounds[1])
-						  )
-						NewRenderPix = cairo.ImageSurface.create_for_data \
-						  (
-							NewRenderPixels, # data
-							cairo.FORMAT_ARGB32, # format
-							ImageBounds[0], # width
-							ImageBounds[1], # height
-							ImageRowStride # stride
-						  )
-						NewRender = cairo.Context(NewRenderPix)
-						NewRender.set_operator(cairo.OPERATOR_SOURCE)
-						  # ensure correct treatment of non-opaque pixels
-						NewRender.rectangle \
-						  (
-							0, # x
-							ImageBounds[1] / 2 - HalfHeight + 1, # y
-							ImageBounds[0], # width
-							2 * HalfHeight - 2 # height
-						  )
-						  # be sure not to pick up any transparent areas outside
-						  # menu image, fudge height a bit to truncate partial
-						  # pixels just in case
-						NewRender.set_matrix \
-						  (
-							ToCairo
-							  (
-									Matrix.translation(- ToMiddle)
-								*
-									Matrix.scaling(Point(1, (9 / 16) / (3 / 4)))
-								*
-									Matrix.translation(ToMiddle)
-							  )
-						  )
-						OldRender = cairo.SurfacePattern(RGBPix)
-						OldRender.set_filter(cairo.FILTER_NEAREST)
-						  # ensure I don't add any new colours
-						NewRender.set_source(OldRender)
-						NewRender.fill()
-						NewRenderPix.flush()
-						OldRender = None # free up memory
-						RGBPixels = NewRenderPixels
-						RGBPix = NewRenderPix
-						RGBRender = NewRender
-					else :
-						MenuBounds = (0, 0) + ImageBounds
-					#end if
-					for \
-						Colors, Suffix \
-					in \
-						(
-							(MainWindow.ColorsNormalList, "normal"),
-							(MainWindow.ColorsHighlightedList, "highlighted"),
-							(MainWindow.ColorsSelectedList, "selected"),
-						) \
-					:
-						# RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
-						ImageName = ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]]
-						Colors = tuple(Color[0] for Color in Colors)
-						IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
-						OutFile = open(ImageName, "w")
-						spuhelper.write_png \
-						  (
-							IndexedImage, # pixels array
-							ImageBounds[0], # width
-							Colors,
-							OutFile
-						  )
-						OutFile.flush()
-						OutFile.close()
-					#end for
-					subpictures = XMLElementTree.Element \
-					  (
-						"subpictures",
-						attrib =
-							{
-								"format" : VideoFormat,
-							}
-					  )
-					stream = XMLElementTree.SubElement(subpictures, "stream")
-					spu = XMLElementTree.SubElement \
-					  (
-						parent = stream,
-						tag = "spu",
-						attrib =
-							{
-								"force" : "yes",
-								# "transparent"?
-								"start" : "00:00:00.0",
-								"end" : "00:00:00.0",
-								"image" : os.path.basename(ImageNames["normal"]),
-								"highlight" : os.path.basename(ImageNames["highlighted"]),
-								"select" : os.path.basename(ImageNames["selected"]),
-							}
-					  )
-					for Button in iter(MainWindow.ButtonList) :
-						ButtonSpec = Button[1]
-						Bounds = MapButtonRect \
-						  (
-							ButtonBounds = ButtonSpec["bounds"],
-							SrcBounds = (0, 0) + LoadedImage.SrcDimensions,
-							DstBounds = MenuBounds
-						  )
-						ButtonAttrs = \
-							{
-								"name" : Button[0],
-								"x0" : str(int(Bounds[0])),
-								"y0" : str(int(Bounds[1]) & ~1),
-								"x1" : str(int(Bounds[0] + Bounds[2])),
-								"y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
-							}
-						for Neighbour in ("up", "down", "left", "right") :
-							if ButtonSpec.has_key(Neighbour) :
-								ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # fixme check it exists?
-							#end if
-						#end for
-						ButtonTag = XMLElementTree.SubElement \
-						  (
-							parent = spu,
-							tag = ("button", "action")[ButtonSpec.get("auto", False)],
-							attrib = ButtonAttrs
-						  )
-					#end for
-					OutFile = open(MenuFileNames[Letterboxed], "w")
-					XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
-					OutFile.flush()
-					OutFile.close()
-				#end if GenerateMenu[Letterboxed]
-				if Letterboxed or not LoadedImage.Widescreen :
-					break
-				Letterboxed = True
-			#end while
-		#end if
-	else :
-		ErrorAlert("Nothing to save.")
-	#end if
+    if LoadedImage.Contents != None :
+        TheDialog = gtk.FileChooserDialog \
+          (
+            title = "Save Menu As:",
+            action = gtk.FILE_CHOOSER_ACTION_SAVE,
+            buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+          )
+        ExtraBox = gtk.Table \
+          (
+            rows = (4, 9)[LoadedImage.Widescreen],
+            columns = 4, # extra columns just to get cell sizes looking right
+            homogeneous = True
+          )
+        FormatRow = (3, 9)[LoadedImage.Widescreen]
+        if LoadedImage.Widescreen :
+            # allow user to save 2 separate menu XML files with associated
+            # image files, one which displays full-height on all screens and
+            # one which displays letterboxed on 4:3 screens
+            ExtraNamesPrompts = \
+                {
+                    "normal" : "Normal Image (Full-Height): ",
+                    "highlighted" : "Highlighted Image (Full-Height): ",
+                    "selected" : "Selected Image (Full-Height): ",
+                    "letterbox" : "Letterboxed Menu: ",
+                    "normal-letterboxed" : "Normal Image (Letterboxed): ",
+                    "highlighted-letterboxed" : "Highlighted Image (Letterboxed): ",
+                    "selected-letterboxed" : "Selected Image (Letterboxed): ",
+                }
+            SelectedAspects[False] = gtk.CheckButton("Save Full-Height Version")
+            SelectedAspects[False].set_active(True) # not default
+            SelectedAspects[False].connect("toggled", SelectedAspectToggled, False)
+            SelectedAspects[True] = gtk.CheckButton("Save Letterboxed Version")
+            SelectedAspects[True].set_active(True) # not default
+            SelectedAspects[True].connect("toggled", SelectedAspectToggled, True)
+            ExtraBox.attach \
+              (
+                SelectedAspects[False],
+                0, 2, 0, 1
+              )
+            ExtraBox.attach \
+              (
+                SelectedAspects[True],
+                0, 2, 4, 5
+              )
+        else :
+            ExtraNamesPrompts = \
+                {
+                    "normal" : "Normal Image: ",
+                    "highlighted" : "Highlighted Image: ",
+                    "selected" : "Selected Image: ",
+                }
+        #end if
+        for \
+                Row, Suffix \
+            in \
+                enumerate \
+                  (
+                        (
+                            (),
+                            (None,), # checkbox goes here (above)
+                        )[LoadedImage.Widescreen]
+                    +
+                        ("normal", "highlighted", "selected")
+                    +
+                        (
+                            (),
+                            (
+                                None, # checkbox goes here (above)
+                                "letterbox",
+                                "normal-letterboxed",
+                                "highlighted-letterboxed",
+                                "selected-letterboxed",
+                            )
+                        )[LoadedImage.Widescreen]
+                  ) \
+        :
+            if Suffix != None :
+                NameLabels[Suffix] = gtk.Label(ExtraNamesPrompts[Suffix])
+                NameLabels[Suffix].set_alignment(0, 0.5)
+                ExtraBox.attach \
+                  (
+                    NameLabels[Suffix],
+                    0, 1, Row, Row + 1
+                  )
+                ExtraFileNames[Suffix] = gtk.Label()
+                ExtraFileNames[Suffix].set_alignment(0, 0.5)
+                if NormalLabelStyle == None :
+                    ExtraFileNames[Suffix].ensure_style()
+                    NormalLabelStyle = ExtraFileNames[Suffix].get_style()
+                #end if
+                ExtraBox.attach \
+                  (
+                    ExtraFileNames[Suffix],
+                    1, 2, Row, Row + 1
+                  )
+            #end if
+        #end if
+        DimmedLabelStyle = gtk.RcStyle()
+        for State in (gtk.STATE_NORMAL,) : # no need for gtk.STATE_INSENSITIVE
+            DimmedLabelStyle.fg[State] = gtk.gdk.color_from_hsv \
+              (
+                hue = NormalLabelStyle.fg[State].hue,
+                saturation = NormalLabelStyle.fg[State].saturation / 2,
+                value = 1.0 - (1.0 - NormalLabelStyle.fg[State].value) / 2
+              )
+        #end if
+        NormalLabelStyle = gtk.RcStyle() # with no customizations
+        NameLabel = gtk.Label("Video Format: ")
+        NameLabel.set_alignment(0, 0.5)
+        ExtraBox.attach \
+          (
+            NameLabel,
+            0, 1, FormatRow, FormatRow + 1
+          )
+        FormatSelector = gtk.combo_box_new_text()
+        default_video_format = get_default_video_format()
+        for i, video_format in enumerate(sorted(valid_video_formats)) :
+            FormatSelector.append_text(video_format)
+            if video_format == default_video_format :
+                FormatSelector.set_active(i)
+            #end if
+        #end for
+        ExtraBox.attach \
+          (
+            FormatSelector,
+            1, 2, FormatRow, FormatRow + 1
+          )
+        ExtraBox.show_all()
+        TheDialog.set_extra_widget(ExtraBox)
+        TheDialog.connect("key-press-event", SaveKeyPress)
+        BaseFileName = os.path.splitext(os.path.basename(LoadedImage.FileName))[0]
+        TheDialog.set_current_name(BaseFileName + ".xml")
+        SynchronizeNames(BaseFileName)
+          # need to pass BaseFileName because TheDialog.get_filename() returns None at this point
+        MenuFileNames = [None, None]
+        GenerateMenu[True] = LoadedImage.Widescreen
+        while True :
+            Response = TheDialog.run()
+            ForgetSynchronize()
+            if Response != gtk.RESPONSE_OK :
+                break
+            #end if
+            SynchronizeNames(None)
+            try : # validate user selection
+                if not (GenerateMenu[False] or GenerateMenu[True]) :
+                    raise Failure("Nothing to do!")
+                #end if
+                VideoFormat = FormatSelector.get_active_text()
+                if VideoFormat not in ("NTSC", "PAL") :
+                    raise Failure("You must choose a video format.")
+                #end if
+                ParentDir = os.path.dirname(TheDialog.get_filename())
+                ImageNames = {}
+                if GenerateMenu[False] :
+                    MenuFileNames[False] = TheDialog.get_filename()
+                    for Suffix in ("normal", "highlighted", "selected") :
+                        ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
+                    #end for
+                #end if
+                if GenerateMenu[True] :
+                    MenuFileNames[True] = os.path.join \
+                      (
+                        ParentDir,
+                        ExtraFileNames["letterbox"].get_text()
+                      )
+                    for Suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
+                        ImageNames[Suffix] = os.path.join(ParentDir, ExtraFileNames[Suffix].get_text())
+                    #end for
+                #end if
+                Overwriting = list \
+                  (
+                    os.path.basename(f)
+                        for f in tuple(MenuFileNames) + tuple(ImageNames.values())
+                        if f != None and os.path.exists(f)
+                  )
+                if len(Overwriting) == 0 :
+                    break
+                ConfirmDialog = gtk.MessageDialog \
+                  (
+                    flags = gtk.DIALOG_MODAL,
+                    buttons = gtk.BUTTONS_OK_CANCEL,
+                    type = gtk.MESSAGE_QUESTION,
+                    message_format =
+                        "File(s) already exist: %s. Overwrite?" % ", ".join(Overwriting)
+                  )
+                Response = ConfirmDialog.run()
+                ConfirmDialog.destroy()
+                if Response == gtk.RESPONSE_OK :
+                    break
+            except Failure, Reason :
+                ErrorAlert(Reason.Msg)
+                # and keep prompting user for save filenames
+            #end try
+        #end while
+        TheDialog.destroy()
+        FillColor = LoadedImage.Colors[0][0] # so leftover pixels get most popular colour
+        # convert native-endian Cairo format
+        if sys.byteorder == "big" :
+            FillColor = (FillColor[3], FillColor[0], FillColor[1], FillColor[2])
+        else :
+            FillColor = (FillColor[2], FillColor[1], FillColor[0], FillColor[3])
+        #end if
+        if MenuFileNames[False] != None :
+            ImageBounds = {"NTSC" : (720, 480), "PAL" : (720, 576)}[VideoFormat]
+            ReferenceScale = ((4, 3), (16, 9))[LoadedImage.Widescreen]
+            ImageRefHeight = ImageBounds[0] / ReferenceScale[0] * ReferenceScale[1]
+              # image height if pixels were square
+            ImageRowStride = ImageBounds[0] * 4 # fixme: use format_stride_for_width
+            Letterboxed = False # which version of menu I'm generating
+            while True : # write menu XML file(s) and associated image files
+                if GenerateMenu[Letterboxed] :
+                    RGBPixels = array.array \
+                      (
+                        "B",
+                            (0, 0, 0, 0) # for correct treatment of non-opaque image pixels
+                        *
+                            (ImageRowStride // 4 * ImageBounds[1])
+                      )
+                    RGBPix = cairo.ImageSurface.create_for_data \
+                      (
+                        RGBPixels, # data
+                        cairo.FORMAT_ARGB32, # format
+                        ImageBounds[0], # width
+                        ImageBounds[1], # height
+                        ImageRowStride # stride
+                      )
+                    RGBRender = cairo.Context(RGBPix)
+                    FitFactor = min \
+                      (
+                        ImageBounds[0] / LoadedImage.SrcDimensions[0],
+                        ImageRefHeight / LoadedImage.SrcDimensions[1],
+                      ) # make sure it's all visible
+                    RGBRender.set_matrix \
+                      (
+                        ToCairo
+                          (
+                            Matrix.scaling(Point
+                              (
+                                FitFactor,
+                                ImageBounds[1] / ImageRefHeight * FitFactor
+                              ))
+                          )
+                      )
+                    svg = rsvg.Handle(data = ImageAsSVG())
+                    svg.render_cairo(RGBRender)
+                    RGBPix.flush()
+                    if Letterboxed :
+                        # squeeze menu image down to letterboxed height
+                        HeightMid = ImageBounds[1] / 2
+                        HalfHeight = ImageBounds[1] / 2 * (9 / 16) / (3 / 4)
+                        MenuBounds = \
+                            (
+                                0,
+                                HeightMid - HalfHeight,
+                                ImageBounds[0],
+                                2 * HalfHeight
+                            )
+                        ToMiddle = Point(0, HeightMid)
+                        NewRenderPixels = array.array \
+                          (
+                            "B",
+                                FillColor
+                            *
+                                (ImageRowStride // 4 * ImageBounds[1])
+                          )
+                        NewRenderPix = cairo.ImageSurface.create_for_data \
+                          (
+                            NewRenderPixels, # data
+                            cairo.FORMAT_ARGB32, # format
+                            ImageBounds[0], # width
+                            ImageBounds[1], # height
+                            ImageRowStride # stride
+                          )
+                        NewRender = cairo.Context(NewRenderPix)
+                        NewRender.set_operator(cairo.OPERATOR_SOURCE)
+                          # ensure correct treatment of non-opaque pixels
+                        NewRender.rectangle \
+                          (
+                            0, # x
+                            ImageBounds[1] / 2 - HalfHeight + 1, # y
+                            ImageBounds[0], # width
+                            2 * HalfHeight - 2 # height
+                          )
+                          # be sure not to pick up any transparent areas outside
+                          # menu image, fudge height a bit to truncate partial
+                          # pixels just in case
+                        NewRender.set_matrix \
+                          (
+                            ToCairo
+                              (
+                                    Matrix.translation(- ToMiddle)
+                                *
+                                    Matrix.scaling(Point(1, (9 / 16) / (3 / 4)))
+                                *
+                                    Matrix.translation(ToMiddle)
+                              )
+                          )
+                        OldRender = cairo.SurfacePattern(RGBPix)
+                        OldRender.set_filter(cairo.FILTER_NEAREST)
+                          # ensure I don't add any new colours
+                        NewRender.set_source(OldRender)
+                        NewRender.fill()
+                        NewRenderPix.flush()
+                        OldRender = None # free up memory
+                        RGBPixels = NewRenderPixels
+                        RGBPix = NewRenderPix
+                        RGBRender = NewRender
+                    else :
+                        MenuBounds = (0, 0) + ImageBounds
+                    #end if
+                    for \
+                        Colors, Suffix \
+                    in \
+                        (
+                            (MainWindow.ColorsNormalList, "normal"),
+                            (MainWindow.ColorsHighlightedList, "highlighted"),
+                            (MainWindow.ColorsSelectedList, "selected"),
+                        ) \
+                    :
+                        # RGBPix.write_to_png(open(ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]] + "-debug.png", "w")) # debug
+                        ImageName = ImageNames[Suffix + ("", "-letterboxed")[Letterboxed]]
+                        Colors = tuple(Color[0] for Color in Colors)
+                        IndexedImage, _ = spuhelper.index_image(RGBPixels, color_approx_count_factor)
+                        OutFile = open(ImageName, "w")
+                        spuhelper.write_png \
+                          (
+                            IndexedImage, # pixels array
+                            ImageBounds[0], # width
+                            Colors,
+                            OutFile
+                          )
+                        OutFile.flush()
+                        OutFile.close()
+                    #end for
+                    subpictures = XMLElementTree.Element \
+                      (
+                        "subpictures",
+                        attrib =
+                            {
+                                "format" : VideoFormat,
+                            }
+                      )
+                    stream = XMLElementTree.SubElement(subpictures, "stream")
+                    spu = XMLElementTree.SubElement \
+                      (
+                        parent = stream,
+                        tag = "spu",
+                        attrib =
+                            {
+                                "force" : "yes",
+                                # "transparent"?
+                                "start" : "00:00:00.0",
+                                "end" : "00:00:00.0",
+                                "image" : os.path.basename(ImageNames["normal"]),
+                                "highlight" : os.path.basename(ImageNames["highlighted"]),
+                                "select" : os.path.basename(ImageNames["selected"]),
+                            }
+                      )
+                    for Button in iter(MainWindow.ButtonList) :
+                        ButtonSpec = Button[1]
+                        Bounds = MapButtonRect \
+                          (
+                            ButtonBounds = ButtonSpec["bounds"],
+                            SrcBounds = (0, 0) + LoadedImage.SrcDimensions,
+                            DstBounds = MenuBounds
+                          )
+                        ButtonAttrs = \
+                            {
+                                "name" : Button[0],
+                                "x0" : str(int(Bounds[0])),
+                                "y0" : str(int(Bounds[1]) & ~1),
+                                "x1" : str(int(Bounds[0] + Bounds[2])),
+                                "y1" : str(int(Bounds[1] + Bounds[3]) & ~1),
+                            }
+                        for Neighbour in ("up", "down", "left", "right") :
+                            if ButtonSpec.has_key(Neighbour) :
+                                ButtonAttrs[Neighbour] = ButtonSpec[Neighbour] # fixme check it exists?
+                            #end if
+                        #end for
+                        ButtonTag = XMLElementTree.SubElement \
+                          (
+                            parent = spu,
+                            tag = ("button", "action")[ButtonSpec.get("auto", False)],
+                            attrib = ButtonAttrs
+                          )
+                    #end for
+                    OutFile = open(MenuFileNames[Letterboxed], "w")
+                    XMLElementTree.ElementTree(subpictures).write(OutFile, "utf-8")
+                    OutFile.flush()
+                    OutFile.close()
+                #end if GenerateMenu[Letterboxed]
+                if Letterboxed or not LoadedImage.Widescreen :
+                    break
+                Letterboxed = True
+            #end while
+        #end if
+    else :
+        ErrorAlert("Nothing to save.")
+    #end if
 #end SelectSaveMenu
 
 def AboutMe(TheWindow) :
-	# displays a dialog showing information about the program.
-	About = gtk.AboutDialog()
-	About.set_name("DVD Menu Animator")
-	About.set_version("0.04")
-	About.set_comments("A utility to ease the construction of DVD-Video menus")
-	About.set_copyright("© 2010, 2011 Lawrence D'Oliveiro")
-	# About.set_license("GPLv3+")
-	# About.set_authors(("Lawrence D'Oliveiro",))
-	About.run()
-	About.destroy()
+    # displays a dialog showing information about the program.
+    About = gtk.AboutDialog()
+    About.set_name("DVD Menu Animator")
+    About.set_version("0.04")
+    About.set_comments("A utility to ease the construction of DVD-Video menus")
+    About.set_copyright("© 2010, 2011 Lawrence D'Oliveiro")
+    # About.set_license("GPLv3+")
+    # About.set_authors(("Lawrence D'Oliveiro",))
+    About.run()
+    About.destroy()
 #end AboutMe
 
 #+
@@ -1829,210 +1829,210 @@ def AboutMe(TheWindow) :
 #-
 
 def SetupMainWindow() :
-	"""creates all the window widgets and attaches all associated event handlers."""
-	global MainWindow
-	MainWindow.Window = gtk.Window()
-	MainWindow.Window.connect("destroy", DestroyWindow)
-	CommonBoxMargin = 8
-	MainPlusMenuBox = gtk.VBox(False, 0)
-	MainMenuBar = BoxPack(gtk.MenuBar(), MainPlusMenuBox)
-	MainBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MainPlusMenuBox)
-	MainBox.set_border_width(CommonBoxMargin)
-	MenuAccelGroup = gtk.AccelGroup()
-	MainWindow.Window.add_accel_group(MenuAccelGroup)
-	FileMenu = NewMenu(MainMenuBar, "File")
-	NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
-	NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
-	NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
-	NewMenuItem(FileMenu, "Reload Saved Colours...", MenuAccelGroup, "R", SelectLoadSavedColors)
-	NewMenuSeparatorItem(FileMenu)
-	NewMenuItem(FileMenu, "Save Menu...", MenuAccelGroup, "S", SelectSaveMenu)
-	NewMenuSeparatorItem(FileMenu)
-	NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
-	HelpMenu = NewMenu(MainMenuBar, "Help")
-	NewMenuItem(HelpMenu, "About DVD Menu Animator...", None, None, AboutMe)
-	MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
-	MiddleBox.set_border_width(CommonBoxMargin)
-	MainWindow.ImageClick = BoxPack(gtk.EventBox(), MiddleBox)
-	MainWindow.ImageDisplay = gtk.Image()
-	MainWindow.ImageClick.add(MainWindow.ImageDisplay)
-	MainWindow.ImageClick.set_visible_window(False)
-	MainWindow.ImageClick.set_above_child(True)
-	MainWindow.ImageClick.set_flags(gtk.CAN_FOCUS)
-	for \
-		Signal \
-	in \
-		(
-			"button-press-event",
-			"button-release-event",
-			"focus-in-event",
-			"focus-out-event",
-			"key-press-event",
-			"motion-notify-event",
-		) \
-	:
-		MainWindow.ImageClick.connect(Signal, ImageClickEvent)
-	#end for
-	ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
-	List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
-	RadioBox = BoxPack(gtk.VBox(False, CommonBoxMargin), List1Box)
-	List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
-	MainWindow.ColorButtonGroup = None
-	MainWindow.Loading = True
-	LoadedImage.ColorShowing = 0
-	BoxPack(gtk.Label("Using Colours:"), RadioBox)
-	for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected", "Live")) :
-		Button = BoxPack(gtk.RadioButton(MainWindow.ColorButtonGroup, Label), RadioBox)
-		Button.set_data("index", Index)
-		Button.set_active(MainWindow.ColorButtonGroup == None)
-		if MainWindow.ColorButtonGroup == None :
-			MainWindow.ColorButtonGroup = Button
-		else :
-			Button.unset_flags(gtk.SENSITIVE) # until an image is loaded
-		#end if
-		Button.connect("toggled", ColorDisplayChanged, Index)
-	#end for
-	MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-	  # first col is display name, second is layer ID
-	MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
-	  # first col is button id/name, second is dictionary containing bounds and other info
-	MainWindow.ButtonHighlight = None
-	  # button to draw in highlighted/selected colours
-	MainWindow.ButtonSelected = False
-	MainWindow.ButtonBlinkTask = None
-	MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
-	MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
-	MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
-	MainWindow.LoadedColorsList = gtk.ListStore(gobject.TYPE_PYOBJECT)
-	NameListBounds = (160, 160)
-	ColorListBounds = (120, 120)
-	MainWindow.ButtonDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.ButtonList,
-		Col = 0,
-		Renderer = None,
-		ColAttribute = "text",
-		Heading = "Buttons",
-		Bounds = NameListBounds,
-		OnSelectionChanged = None, # fixme perhaps sync list selection to live button selection
-		AddToBox = List1Box
-	  )
-	MainWindow.LayerDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.LayerList,
-		Col = 0,
-		Renderer = None,
-		ColAttribute = "text",
-		Heading = "Button Layer",
-		Bounds = NameListBounds,
-		OnSelectionChanged = LayerSelectionChanged,
-		AddToBox = List1Box
-	  )
-	MainWindow.ColorsNormalDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.ColorsNormalList,
-		Col = 0,
-		Renderer = ColorCellRenderer(),
-		ColAttribute = None,
-		  # can't just simply add my own properties without registering them for an object class
-		Heading = "Normal",
-		Bounds = ColorListBounds,
-		OnSelectionChanged = None,
-		AddToBox = List2Box
-	  )
-	MainWindow.ColorsHighlightedDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.ColorsHighlightedList,
-		Col = 0,
-		Renderer = ColorCellRenderer(),
-		ColAttribute = None,
-		Heading = "Highlight",
-		Bounds = ColorListBounds,
-		OnSelectionChanged = None,
-		AddToBox = List2Box
-	  )
-	MainWindow.ColorsSelectedDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.ColorsSelectedList,
-		Col = 0,
-		Renderer = ColorCellRenderer(),
-		ColAttribute = None,
-		Heading = "Select",
-		Bounds = ColorListBounds,
-		OnSelectionChanged = None,
-		AddToBox = List2Box
-	  )
-	MainWindow.LoadedColorsDisplay = DefineScrollingList \
-	  (
-		ListModel = MainWindow.LoadedColorsList,
-		Col = 0,
-		Renderer = ColorCellRenderer(),
-		ColAttribute = None,
-		Heading = "",
-		Bounds = (ColorListBounds[0], ColorListBounds[1] * 2),
-		OnSelectionChanged = None,
-		AddToBox = MiddleBox
-	  )
-	for \
-		ColorList \
-	in \
-		(
-			MainWindow.ColorsNormalDisplay,
-			MainWindow.ColorsHighlightedDisplay,
-			MainWindow.ColorsSelectedDisplay,
-		) \
-	:
-		ColorList.connect("row-activated", EditColor)
-		ColorList.connect("drag-data-get", DragGetColor)
-		ColorList.connect("drag-data-received", DragSetColor)
-		ColorList.drag_dest_set \
-		  (
-			flags = gtk.DEST_DEFAULT_ALL,
-			targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-			actions = gtk.gdk.ACTION_COPY
-		  )
-		ColorList.drag_source_set \
-		  (
-			start_button_mask = gtk.gdk.BUTTON1_MASK,
-			targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-			actions = gtk.gdk.ACTION_COPY
-		  )
-	#end for
-	MainWindow.LoadedColorsDisplay.connect("drag-data-get", DragGetColor)
-	MainWindow.LoadedColorsDisplay.drag_source_set \
-	  (
-		start_button_mask = gtk.gdk.BUTTON1_MASK,
-		targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-		actions = gtk.gdk.ACTION_COPY
-	  )
-	MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
-	MainWindow.Window.add(MainPlusMenuBox)
-	MainWindow.Window.show_all()
+    """creates all the window widgets and attaches all associated event handlers."""
+    global MainWindow
+    MainWindow.Window = gtk.Window()
+    MainWindow.Window.connect("destroy", DestroyWindow)
+    CommonBoxMargin = 8
+    MainPlusMenuBox = gtk.VBox(False, 0)
+    MainMenuBar = BoxPack(gtk.MenuBar(), MainPlusMenuBox)
+    MainBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MainPlusMenuBox)
+    MainBox.set_border_width(CommonBoxMargin)
+    MenuAccelGroup = gtk.AccelGroup()
+    MainWindow.Window.add_accel_group(MenuAccelGroup)
+    FileMenu = NewMenu(MainMenuBar, "File")
+    NewMenuItem(FileMenu, "Load Menu Image...", MenuAccelGroup, "O", SelectLoadMenuImage)
+    NewMenuItem(FileMenu, "Load Background Image...", MenuAccelGroup, "B", SelectLoadBackgroundImage)
+    NewMenuItem(FileMenu, "Load Colours...", MenuAccelGroup, "L", SelectLoadColors)
+    NewMenuItem(FileMenu, "Reload Saved Colours...", MenuAccelGroup, "R", SelectLoadSavedColors)
+    NewMenuSeparatorItem(FileMenu)
+    NewMenuItem(FileMenu, "Save Menu...", MenuAccelGroup, "S", SelectSaveMenu)
+    NewMenuSeparatorItem(FileMenu)
+    NewMenuItem(FileMenu, "Quit", MenuAccelGroup, "Q", gtk.main_quit)
+    HelpMenu = NewMenu(MainMenuBar, "Help")
+    NewMenuItem(HelpMenu, "About DVD Menu Animator...", None, None, AboutMe)
+    MiddleBox = BoxPack(gtk.HBox(False, CommonBoxMargin), MainBox)
+    MiddleBox.set_border_width(CommonBoxMargin)
+    MainWindow.ImageClick = BoxPack(gtk.EventBox(), MiddleBox)
+    MainWindow.ImageDisplay = gtk.Image()
+    MainWindow.ImageClick.add(MainWindow.ImageDisplay)
+    MainWindow.ImageClick.set_visible_window(False)
+    MainWindow.ImageClick.set_above_child(True)
+    MainWindow.ImageClick.set_flags(gtk.CAN_FOCUS)
+    for \
+        Signal \
+    in \
+        (
+            "button-press-event",
+            "button-release-event",
+            "focus-in-event",
+            "focus-out-event",
+            "key-press-event",
+            "motion-notify-event",
+        ) \
+    :
+        MainWindow.ImageClick.connect(Signal, ImageClickEvent)
+    #end for
+    ListsColBox = BoxPack(gtk.VBox(False, CommonBoxMargin), MiddleBox)
+    List1Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
+    RadioBox = BoxPack(gtk.VBox(False, CommonBoxMargin), List1Box)
+    List2Box = BoxPack(gtk.HBox(False, CommonBoxMargin), ListsColBox)
+    MainWindow.ColorButtonGroup = None
+    MainWindow.Loading = True
+    LoadedImage.ColorShowing = 0
+    BoxPack(gtk.Label("Using Colours:"), RadioBox)
+    for Index, Label in enumerate(("Original", "Normal", "Highlighted", "Selected", "Live")) :
+        Button = BoxPack(gtk.RadioButton(MainWindow.ColorButtonGroup, Label), RadioBox)
+        Button.set_data("index", Index)
+        Button.set_active(MainWindow.ColorButtonGroup == None)
+        if MainWindow.ColorButtonGroup == None :
+            MainWindow.ColorButtonGroup = Button
+        else :
+            Button.unset_flags(gtk.SENSITIVE) # until an image is loaded
+        #end if
+        Button.connect("toggled", ColorDisplayChanged, Index)
+    #end for
+    MainWindow.LayerList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+      # first col is display name, second is layer ID
+    MainWindow.ButtonList = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+      # first col is button id/name, second is dictionary containing bounds and other info
+    MainWindow.ButtonHighlight = None
+      # button to draw in highlighted/selected colours
+    MainWindow.ButtonSelected = False
+    MainWindow.ButtonBlinkTask = None
+    MainWindow.ColorsNormalList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+    MainWindow.ColorsHighlightedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+    MainWindow.ColorsSelectedList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+    MainWindow.LoadedColorsList = gtk.ListStore(gobject.TYPE_PYOBJECT)
+    NameListBounds = (160, 160)
+    ColorListBounds = (120, 120)
+    MainWindow.ButtonDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.ButtonList,
+        Col = 0,
+        Renderer = None,
+        ColAttribute = "text",
+        Heading = "Buttons",
+        Bounds = NameListBounds,
+        OnSelectionChanged = None, # fixme perhaps sync list selection to live button selection
+        AddToBox = List1Box
+      )
+    MainWindow.LayerDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.LayerList,
+        Col = 0,
+        Renderer = None,
+        ColAttribute = "text",
+        Heading = "Button Layer",
+        Bounds = NameListBounds,
+        OnSelectionChanged = LayerSelectionChanged,
+        AddToBox = List1Box
+      )
+    MainWindow.ColorsNormalDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.ColorsNormalList,
+        Col = 0,
+        Renderer = ColorCellRenderer(),
+        ColAttribute = None,
+          # can't just simply add my own properties without registering them for an object class
+        Heading = "Normal",
+        Bounds = ColorListBounds,
+        OnSelectionChanged = None,
+        AddToBox = List2Box
+      )
+    MainWindow.ColorsHighlightedDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.ColorsHighlightedList,
+        Col = 0,
+        Renderer = ColorCellRenderer(),
+        ColAttribute = None,
+        Heading = "Highlight",
+        Bounds = ColorListBounds,
+        OnSelectionChanged = None,
+        AddToBox = List2Box
+      )
+    MainWindow.ColorsSelectedDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.ColorsSelectedList,
+        Col = 0,
+        Renderer = ColorCellRenderer(),
+        ColAttribute = None,
+        Heading = "Select",
+        Bounds = ColorListBounds,
+        OnSelectionChanged = None,
+        AddToBox = List2Box
+      )
+    MainWindow.LoadedColorsDisplay = DefineScrollingList \
+      (
+        ListModel = MainWindow.LoadedColorsList,
+        Col = 0,
+        Renderer = ColorCellRenderer(),
+        ColAttribute = None,
+        Heading = "",
+        Bounds = (ColorListBounds[0], ColorListBounds[1] * 2),
+        OnSelectionChanged = None,
+        AddToBox = MiddleBox
+      )
+    for \
+        ColorList \
+    in \
+        (
+            MainWindow.ColorsNormalDisplay,
+            MainWindow.ColorsHighlightedDisplay,
+            MainWindow.ColorsSelectedDisplay,
+        ) \
+    :
+        ColorList.connect("row-activated", EditColor)
+        ColorList.connect("drag-data-get", DragGetColor)
+        ColorList.connect("drag-data-received", DragSetColor)
+        ColorList.drag_dest_set \
+          (
+            flags = gtk.DEST_DEFAULT_ALL,
+            targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+            actions = gtk.gdk.ACTION_COPY
+          )
+        ColorList.drag_source_set \
+          (
+            start_button_mask = gtk.gdk.BUTTON1_MASK,
+            targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+            actions = gtk.gdk.ACTION_COPY
+          )
+    #end for
+    MainWindow.LoadedColorsDisplay.connect("drag-data-get", DragGetColor)
+    MainWindow.LoadedColorsDisplay.drag_source_set \
+      (
+        start_button_mask = gtk.gdk.BUTTON1_MASK,
+        targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
+        actions = gtk.gdk.ACTION_COPY
+      )
+    MainWindow.StatusMsg = BoxPack(gtk.Label(), MainBox)
+    MainWindow.Window.add(MainPlusMenuBox)
+    MainWindow.Window.show_all()
 #end SetupMainWindow
 
 def ParseCommandLine() :
-	"""parses command-line options for preloading menu image and other files."""
-	(Opts, Args) = getopt.getopt \
-	  (
-		sys.argv[1:],
-		"",
-		["background=", "palette=", "saved="]
-	  )
-	if len(Args) > 1 :
-		raise getopt.GetoptError("expecting no more than one arg, the menu image filename to load")
-	#end if
-	if len(Args) > 0 :
-		LoadMenuImage(Args[0])
-	#end if
-	for Keyword, Value in Opts :
-		if Keyword == "--background" :
-			LoadBackgroundImage(Value)
-		elif Keyword == "--palette" :
-			LoadColors(Value)
-		elif Keyword == "--saved" :
-			LoadSavedColors(Value)
-		#end if
-	#end for
+    """parses command-line options for preloading menu image and other files."""
+    (Opts, Args) = getopt.getopt \
+      (
+        sys.argv[1:],
+        "",
+        ["background=", "palette=", "saved="]
+      )
+    if len(Args) > 1 :
+        raise getopt.GetoptError("expecting no more than one arg, the menu image filename to load")
+    #end if
+    if len(Args) > 0 :
+        LoadMenuImage(Args[0])
+    #end if
+    for Keyword, Value in Opts :
+        if Keyword == "--background" :
+            LoadBackgroundImage(Value)
+        elif Keyword == "--palette" :
+            LoadColors(Value)
+        elif Keyword == "--saved" :
+            LoadSavedColors(Value)
+        #end if
+    #end for
 #end ParseCommandLine
 
 SetupMainWindow()
