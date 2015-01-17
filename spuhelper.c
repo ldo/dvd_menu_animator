@@ -2,7 +2,7 @@
     Python extension module for DVD Menu Animator script. This performs
     pixel-level manipulations that would be too slow done in Python.
 
-    Copyright 2010 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+    Copyright 2010, 2015 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 
     This file is part of DVD Menu Animator.
 
@@ -135,77 +135,77 @@ static void sort_hist_by_count
       } /*while*/
   } /*sort_hist_by_count*/
 
-static void GetBufferInfo
+static void get_buffer_info
   (
-    PyObject * FromArray,
+    PyObject * from_array,
     unsigned long * addr,
     unsigned long * len
   )
   /* returns the address and length of the data in a Python array object. */
   {
-    PyObject * TheBufferInfo = 0;
-    PyObject * AddrObj = 0;
-    PyObject * LenObj = 0;
+    PyObject * the_buffer_info = 0;
+    PyObject * addr_obj = 0;
+    PyObject * len_obj = 0;
     do /*once*/
       {
-        TheBufferInfo = PyObject_CallMethod(FromArray, "buffer_info", "");
-        if (TheBufferInfo == 0)
+        the_buffer_info = PyObject_CallMethod(from_array, "buffer_info", "");
+        if (the_buffer_info == 0)
             break;
-        AddrObj = PyTuple_GetItem(TheBufferInfo, 0);
+        addr_obj = PyTuple_GetItem(the_buffer_info, 0);
         if (PyErr_Occurred())
             break;
-        Py_INCREF(AddrObj);
-        LenObj = PyTuple_GetItem(TheBufferInfo, 1);
+        Py_INCREF(addr_obj);
+        len_obj = PyTuple_GetItem(the_buffer_info, 1);
         if (PyErr_Occurred())
             break;
-        Py_INCREF(LenObj);
-        *addr = PyInt_AsUnsignedLongMask(AddrObj);
-        *len = PyInt_AsUnsignedLongMask(LenObj);
+        Py_INCREF(len_obj);
+        *addr = PyInt_AsUnsignedLongMask(addr_obj);
+        *len = PyInt_AsUnsignedLongMask(len_obj);
         if (PyErr_Occurred())
             break;
       }
     while (false);
-    Py_XDECREF(AddrObj);
-    Py_XDECREF(LenObj);
-    Py_XDECREF(TheBufferInfo);
-  } /*GetBufferInfo*/
+    Py_XDECREF(addr_obj);
+    Py_XDECREF(len_obj);
+    Py_XDECREF(the_buffer_info);
+  } /*get_buffer_info*/
 
-static long GetIntProperty
+static long get_int_property
   (
-    PyObject * FromGObject,
-    const char * PropertyName
+    PyObject * from_gobject,
+    const char * property_name
   )
   /* gets an integer-valued property from a gobject.GObject. */
   {
     long result = 0; /* arbitrary to begin with */
-    PyObject * PropValue = 0;
+    PyObject * propvalue = 0;
     do /*once*/
       {
-        PropValue = PyObject_CallMethod(FromGObject, "get_property", "s", PropertyName);
-        if (PropValue == 0)
+        propvalue = PyObject_CallMethod(from_gobject, "get_property", "s", property_name);
+        if (propvalue == 0)
             break;
-        result = PyInt_AsLong(PropValue);
+        result = PyInt_AsLong(propvalue);
       }
     while (false);
-    Py_XDECREF(PropValue);
+    Py_XDECREF(propvalue);
     return result;
-  } /*GetIntProperty*/
+  } /*get_int_property*/
 
-static bool GetBoolProperty
+static bool get_bool_property
   (
-    PyObject * FromGObject,
-    const char * PropertyName
+    PyObject * from_gobject,
+    const char * property_name
   )
   /* gets a boolean-valued property from a gobject.GObject. */
   {
     bool result = false; /* arbitrary to begin with */
-    PyObject * PropValue = 0;
+    PyObject * propvalue = 0;
     do /*once*/
       {
-        PropValue = PyObject_CallMethod(FromGObject, "get_property", "s", PropertyName);
-        if (PropValue == 0)
+        propvalue = PyObject_CallMethod(from_gobject, "get_property", "s", property_name);
+        if (propvalue == 0)
             break;
-        if (!PyBool_Check(PropValue))
+        if (!PyBool_Check(propvalue))
           {
             PyErr_SetString
               (
@@ -214,27 +214,27 @@ static bool GetBoolProperty
               );
             break;
           } /*if*/
-        result = PyObject_Compare(PropValue, Py_False) != 0;
+        result = PyObject_Compare(propvalue, Py_False) != 0;
       }
     while (false);
-    Py_XDECREF(PropValue);
+    Py_XDECREF(propvalue);
     return result;
-  } /*GetBoolProperty*/
+  } /*get_bool_property*/
 
-static void ParseColorsTuple
+static void parse_colors_tuple
   (
-    PyObject * ColorTuple,
+    PyObject * color_tuple,
     uint32_t * colors /* array of 4 elements */
   )
-  /* parses ColorTuple as a tuple of 4 elements, each in turn being a tuple of
+  /* parses color_tuple as a tuple of 4 elements, each in turn being a tuple of
     4 integers (r, g, b, a) each in the range [0 .. 255]. Puts the result as
     Cairo-format pixel values into colors. */
   {
-    PyObject * TheColors[4] = {0, 0, 0, 0};
+    PyObject * the_colors[4] = {0, 0, 0, 0};
     unsigned int nrcolors, i, j, channel[4];
     do /*once*/
       {
-        nrcolors = PyTuple_Size(ColorTuple);
+        nrcolors = PyTuple_Size(color_tuple);
         if (PyErr_Occurred())
             break;
         if (nrcolors > 4)
@@ -243,13 +243,13 @@ static void ParseColorsTuple
           } /*if*/
         for (i = 0; i < nrcolors; ++i)
           {
-            TheColors[i] = PyTuple_GetItem(ColorTuple, i);
+            the_colors[i] = PyTuple_GetItem(color_tuple, i);
           } /*for*/
         if (PyErr_Occurred())
             break;
         for (i = 0; i < nrcolors; ++i)
           {
-            Py_INCREF(TheColors[i]);
+            Py_INCREF(the_colors[i]);
           } /*for*/
         for (i = 0;;)
           {
@@ -259,10 +259,10 @@ static void ParseColorsTuple
               {
                 if (j == 4)
                     break;
-                PyObject * ColorObj = PyTuple_GetItem(TheColors[i], j);
+                PyObject * color_obj = PyTuple_GetItem(the_colors[i], j);
                 if (PyErr_Occurred())
                     break;
-                const long chanval = PyInt_AsLong(ColorObj);
+                const long chanval = PyInt_AsLong(color_obj);
                 if (PyErr_Occurred())
                     break;
                 if (chanval < 0 || chanval > 255)
@@ -295,14 +295,14 @@ static void ParseColorsTuple
           {
           /* fill unused entries with transparent colour */
             colors[i] = 0;
-          } /*if*/
+          } /*for*/
       }
     while (false);
     for (i = 0; i < 4; ++i)
       {
-        Py_XDECREF(TheColors[i]);
+        Py_XDECREF(the_colors[i]);
       } /*for*/
-  } /*ParseColorsTuple*/
+  } /*parse_colors_tuple*/
 
 /*
     User-visible stuff
@@ -319,24 +319,24 @@ static PyObject * spuhelper_index_image
     unsigned long count_factor;
       /* ignore excess colours provided they make up no more than a proportion
         1 / count_factor of the pixels */
-    PyObject * Result = 0;
-    PyObject * ArrayModule = 0;
-    PyObject * SrcArray = 0;
+    PyObject * result = 0;
+    PyObject * array_module = 0;
+    PyObject * srcarray = 0;
     unsigned long pixaddr, nrpixbytes, nrpixels, pixlen;
     const uint32_t * pixels;
     unsigned long nrhistentries = 0, maxhistentries, histindex;
     histentry * histogram = 0;
-    PyObject * ResultArray = 0;
-    PyObject * HistTuple = 0;
+    PyObject * result_array = 0;
+    PyObject * hist_tuple = 0;
     do /*once*/
       {
-        ArrayModule = PyImport_ImportModule("array");
-        if (ArrayModule == 0)
+        array_module = PyImport_ImportModule("array");
+        if (array_module == 0)
             break;
-        if (!PyArg_ParseTuple(args, "Ok", &SrcArray, &count_factor))
+        if (!PyArg_ParseTuple(args, "Ok", &srcarray, &count_factor))
             break;
-        Py_INCREF(SrcArray);
-        GetBufferInfo(SrcArray, &pixaddr, &nrpixbytes);
+        Py_INCREF(srcarray);
+        get_buffer_info(srcarray, &pixaddr, &nrpixbytes);
         if (PyErr_Occurred())
             break;
         pixels = (const uint32_t *)pixaddr;
@@ -478,58 +478,58 @@ static PyObject * spuhelper_index_image
               }
               {
               /* generate indexed version of image */
-                const size_t PixBufSize = 128 /* convenient buffer size to avoid heap allocation */;
-                const size_t MaxPixels = PixBufSize * 4; /* 2 bits per pixel */
-                uint8_t PixBuf[PixBufSize];
-                size_t BufPixels;
-                ResultArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
-                if (ResultArray == 0)
+                const size_t pixbufsize = 128 /* convenient buffer size to avoid heap allocation */;
+                const size_t max_pixels = pixbufsize * 4; /* 2 bits per pixel */
+                uint8_t pixbuf[pixbufsize];
+                size_t bufpixels;
+                result_array = PyObject_CallMethod(array_module, "array", "s", "B");
+                if (result_array == 0)
                     break;
                 pixels = (const uint32_t *)pixaddr;
                 pixlen = nrpixels;
-                BufPixels = 0;
+                bufpixels = 0;
                 for (;;)
                   {
-                  /* extend ResultArray by a bunch of converted pixels at a time */
-                    if (pixlen == 0 || BufPixels == MaxPixels)
+                  /* extend result_array by a bunch of converted pixels at a time */
+                    if (pixlen == 0 || bufpixels == max_pixels)
                       {
-                        PyObject * BufString = 0;
-                        PyObject * Result = 0;
+                        PyObject * bufstring = 0;
+                        PyObject * result = 0;
                         do /*once*/
                           {
-                            if (BufPixels == 0)
+                            if (bufpixels == 0)
                                 break; /* nothing to flush out */
-                            if (BufPixels % 4 != 0)
+                            if (bufpixels % 4 != 0)
                               {
                               /* fill out unused part of byte with zeroes--actually shouldn't occur */
-                                PixBuf[BufPixels / 4] &= ~(0xff << BufPixels % 4 * 2);
+                                pixbuf[bufpixels / 4] &= ~(0xff << bufpixels % 4 * 2);
                               } /*if*/
-                            BufString = PyString_FromStringAndSize((const char *)PixBuf, (BufPixels + 3) / 4);
-                            if (BufString == 0)
+                            bufstring = PyString_FromStringAndSize((const char *)pixbuf, (bufpixels + 3) / 4);
+                            if (bufstring == 0)
                                 break;
-                            Result = PyObject_CallMethod(ResultArray, "fromstring", "O", BufString);
-                            if (Result == 0)
+                            result = PyObject_CallMethod(result_array, "fromstring", "O", bufstring);
+                            if (result == 0)
                                 break;
                           }
                         while (false);
-                        Py_XDECREF(Result);
-                        Py_XDECREF(BufString);
+                        Py_XDECREF(result);
+                        Py_XDECREF(bufstring);
                         if (PyErr_Occurred())
                             break;
                         if (pixlen == 0)
                             break;
-                        BufPixels = 0;
+                        bufpixels = 0;
                       } /*if*/
                     const uint32_t thispixel = *pixels;
                     for (histindex = 0; histogram[histindex].pixel != thispixel; ++histindex)
                       /* guaranteed to find pixel index */;
-                    if (BufPixels % 4 == 0)
+                    if (bufpixels % 4 == 0)
                       {
                       /* starting new byte */
-                        PixBuf[BufPixels / 4] = 0; /* ensure there's no junk in it */
+                        pixbuf[bufpixels / 4] = 0; /* ensure there's no junk in it */
                       } /*if*/
-                    PixBuf[BufPixels / 4] |= histogram[histindex].index << BufPixels % 4 * 2;
-                    ++BufPixels;
+                    pixbuf[bufpixels / 4] |= histogram[histindex].index << bufpixels % 4 * 2;
+                    ++bufpixels;
                     ++pixels;
                     --pixlen;
                   } /*for*/
@@ -541,45 +541,45 @@ static PyObject * spuhelper_index_image
           {
           /* too many different colours, don't bother building an indexed version of image */
             Py_INCREF(Py_None);
-            ResultArray = Py_None;
+            result_array = Py_None;
           } /*if*/
-        HistTuple = PyTuple_New(nrhistentries);
-        if (HistTuple == 0)
+        hist_tuple = PyTuple_New(nrhistentries);
+        if (hist_tuple == 0)
             break;
         for (histindex = 0;;)
           {
-          /* fill in HistTuple */
+          /* fill in hist_tuple */
             if (histindex == nrhistentries)
                 break;
-            PyObject * HistEntryTuple = 0;
-            PyObject * ColorTuple = 0;
-            PyObject * Count = 0;
+            PyObject * hist_entry_tuple = 0;
+            PyObject * color_tuple = 0;
+            PyObject * count = 0;
             do /*once*/
               {
                 const uint32_t pixel = histogram[histindex].pixel;
-                ColorTuple = PyTuple_New(4);
-                if (ColorTuple == 0)
+                color_tuple = PyTuple_New(4);
+                if (color_tuple == 0)
                     break;
-                PyTuple_SET_ITEM(ColorTuple, 0, PyInt_FromLong(pixel >> 16 & 255)); /* R */
-                PyTuple_SET_ITEM(ColorTuple, 1, PyInt_FromLong(pixel >> 8 & 255)); /* G */
-                PyTuple_SET_ITEM(ColorTuple, 2, PyInt_FromLong(pixel & 255)); /* B */
-                PyTuple_SET_ITEM(ColorTuple, 3, PyInt_FromLong(pixel >> 24 & 255)); /* A */
-                Count = PyInt_FromLong(histogram[histindex].count);
-                HistEntryTuple = PyTuple_New(2);
+                PyTuple_SET_ITEM(color_tuple, 0, PyInt_FromLong(pixel >> 16 & 255)); /* R */
+                PyTuple_SET_ITEM(color_tuple, 1, PyInt_FromLong(pixel >> 8 & 255)); /* G */
+                PyTuple_SET_ITEM(color_tuple, 2, PyInt_FromLong(pixel & 255)); /* B */
+                PyTuple_SET_ITEM(color_tuple, 3, PyInt_FromLong(pixel >> 24 & 255)); /* A */
+                count = PyInt_FromLong(histogram[histindex].count);
+                hist_entry_tuple = PyTuple_New(2);
                 if (PyErr_Occurred())
                     break;
-                PyTuple_SET_ITEM(HistEntryTuple, 0, ColorTuple);
-                PyTuple_SET_ITEM(HistEntryTuple, 1, Count);
-                PyTuple_SET_ITEM(HistTuple, histindex, HistEntryTuple);
+                PyTuple_SET_ITEM(hist_entry_tuple, 0, color_tuple);
+                PyTuple_SET_ITEM(hist_entry_tuple, 1, count);
+                PyTuple_SET_ITEM(hist_tuple, histindex, hist_entry_tuple);
               /* lose stolen references */
-                ColorTuple = 0;
-                Count = 0;
-                HistEntryTuple = 0;
+                color_tuple = 0;
+                count = 0;
+                hist_entry_tuple = 0;
               }
             while (false);
-            Py_XDECREF(Count);
-            Py_XDECREF(ColorTuple);
-            Py_XDECREF(HistEntryTuple);
+            Py_XDECREF(count);
+            Py_XDECREF(color_tuple);
+            Py_XDECREF(hist_entry_tuple);
             if (PyErr_Occurred())
                 break;
             ++histindex;
@@ -587,15 +587,15 @@ static PyObject * spuhelper_index_image
         if (PyErr_Occurred())
             break;
       /* all done */
-        Result = Py_BuildValue("OO", ResultArray, HistTuple);
+        result = Py_BuildValue("OO", result_array, hist_tuple);
       }
     while (false);
-    Py_XDECREF(HistTuple);
-    Py_XDECREF(ResultArray);
+    Py_XDECREF(hist_tuple);
+    Py_XDECREF(result_array);
     free(histogram);
-    Py_XDECREF(SrcArray);
-    Py_XDECREF(ArrayModule);
-    return Result;
+    Py_XDECREF(srcarray);
+    Py_XDECREF(array_module);
+    return result;
   } /*spuhelper_index_image*/
 
 static PyObject * spuhelper_expand_image
@@ -605,94 +605,94 @@ static PyObject * spuhelper_expand_image
   )
   /* expands a 2-bit-per-pixel image, substituting the specified colours. */
   {
-    PyObject * Result = 0;
-    PyObject * SrcArray = 0;
-    PyObject * ColorTuple = 0;
-    PyObject * ArrayModule = 0;
-    PyObject * DstArray = 0;
+    PyObject * result = 0;
+    PyObject * srcarray = 0;
+    PyObject * color_tuple = 0;
+    PyObject * array_module = 0;
+    PyObject * dstarray = 0;
     unsigned long srcpixaddr, nrsrcpixbytes;
     uint32_t colors[4];
     do /*once*/
       {
-        if (!PyArg_ParseTuple(args, "OO", &SrcArray, &ColorTuple))
+        if (!PyArg_ParseTuple(args, "OO", &srcarray, &color_tuple))
             break;
-        Py_INCREF(SrcArray);
-        Py_INCREF(ColorTuple);
-        ArrayModule = PyImport_ImportModule("array");
-        if (ArrayModule == 0)
+        Py_INCREF(srcarray);
+        Py_INCREF(color_tuple);
+        array_module = PyImport_ImportModule("array");
+        if (array_module == 0)
             break;
-        GetBufferInfo(SrcArray, &srcpixaddr, &nrsrcpixbytes);
+        get_buffer_info(srcarray, &srcpixaddr, &nrsrcpixbytes);
         if (PyErr_Occurred())
             break;
-        ParseColorsTuple(ColorTuple, colors);
+        parse_colors_tuple(color_tuple, colors);
         if (PyErr_Occurred())
             break;
-        DstArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
-        if (DstArray == 0)
+        dstarray = PyObject_CallMethod(array_module, "array", "s", "B");
+        if (dstarray == 0)
             break;
           {
           /* expand the pixels */
-            const unsigned long MaxBufPixels = 128 /* convenient buffer size to avoid heap allocation */;
-            uint32_t PixBuf[MaxBufPixels];
-            const uint8_t * SrcPixels = (const uint8_t *)srcpixaddr;
-            unsigned long NrBufPixels, NrSrcPixels, SrcPixIndex;
-            unsigned int SrcPix;
-            NrSrcPixels = nrsrcpixbytes << 2;
-            SrcPixIndex = 0;
-            NrBufPixels = 0;
+            const unsigned long maxbufpixels = 128 /* convenient buffer size to avoid heap allocation */;
+            uint32_t pixbuf[maxbufpixels];
+            const uint8_t * srcpixels = (const uint8_t *)srcpixaddr;
+            unsigned long nr_buf_pixels, nr_src_pixels, src_pix_index;
+            unsigned int srcpix;
+            nr_src_pixels = nrsrcpixbytes << 2;
+            src_pix_index = 0;
+            nr_buf_pixels = 0;
             for (;;)
               {
-                if (NrSrcPixels == 0 || NrBufPixels == MaxBufPixels)
+                if (nr_src_pixels == 0 || nr_buf_pixels == maxbufpixels)
                   {
-                    PyObject * BufString = 0;
-                    PyObject * Result = 0;
+                    PyObject * bufstring = 0;
+                    PyObject * result = 0;
                     do /*once*/
                       {
-                        if (NrBufPixels == 0)
+                        if (nr_buf_pixels == 0)
                             break; /* nothing to flush out */
-                        BufString = PyString_FromStringAndSize((const char *)PixBuf, NrBufPixels * 4);
-                        if (BufString == 0)
+                        bufstring = PyString_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
+                        if (bufstring == 0)
                             break;
-                        Result = PyObject_CallMethod(DstArray, "fromstring", "O", BufString);
-                        if (Result == 0)
+                        result = PyObject_CallMethod(dstarray, "fromstring", "O", bufstring);
+                        if (result == 0)
                             break;
                       }
                     while (false);
-                    Py_XDECREF(Result);
-                    Py_XDECREF(BufString);
+                    Py_XDECREF(result);
+                    Py_XDECREF(bufstring);
                     if (PyErr_Occurred())
                         break;
-                    if (NrSrcPixels == 0)
+                    if (nr_src_pixels == 0)
                         break;
-                    NrBufPixels = 0;
+                    nr_buf_pixels = 0;
                   } /*if*/
-                if (SrcPixIndex == 0)
+                if (src_pix_index == 0)
                   {
-                    SrcPix = *SrcPixels;
+                    srcpix = *srcpixels;
                   } /*if*/
-                PixBuf[NrBufPixels] = colors[SrcPix >> SrcPixIndex * 2 & 3];
-                ++NrBufPixels;
-                ++SrcPixIndex;
-                if (SrcPixIndex == 4)
+                pixbuf[nr_buf_pixels] = colors[srcpix >> src_pix_index * 2 & 3];
+                ++nr_buf_pixels;
+                ++src_pix_index;
+                if (src_pix_index == 4)
                   {
-                    ++SrcPixels;
-                    SrcPixIndex = 0;
+                    ++srcpixels;
+                    src_pix_index = 0;
                   } /*if*/
-                --NrSrcPixels;
+                --nr_src_pixels;
               } /*for*/
             if (PyErr_Occurred())
                 break;
           }
       /* all done */
-        Result = DstArray;
-        DstArray = 0; /* so I don't dispose of it yet */
+        result = dstarray;
+        dstarray = 0; /* so I don't dispose of it yet */
       }
     while (false);
-    Py_XDECREF(DstArray);
-    Py_XDECREF(ArrayModule);
-    Py_XDECREF(ColorTuple);
-    Py_XDECREF(SrcArray);
-    return Result;
+    Py_XDECREF(dstarray);
+    Py_XDECREF(array_module);
+    Py_XDECREF(color_tuple);
+    Py_XDECREF(srcarray);
+    return result;
   } /*spuhelper_expand_image*/
 
 static PyObject * spuhelper_gtk_to_cairo_a
@@ -704,43 +704,43 @@ static PyObject * spuhelper_gtk_to_cairo_a
     a fully-opaque alpha channel, and returns the result in a new array object. */
   {
     PyObject * result = 0;
-    PyObject * ArrayModule = 0;
-    PyObject * SrcPixBuf = 0;
-    PyObject * SrcPixString = 0;
-    PyObject * SrcPixArray = 0;
-    PyObject * DstArray = 0;
-    unsigned long PixBase, PixLen, ImageWidth, ImageHeight, RowStride;
-    unsigned int NrChannels;
-    bool HasAlpha;
+    PyObject * array_module = 0;
+    PyObject * srcpixbuf = 0;
+    PyObject * srcpixstring = 0;
+    PyObject * srcpixarray = 0;
+    PyObject * dstarray = 0;
+    unsigned long pixbase, pixlen, image_width, image_height, row_stride;
+    unsigned int nr_channels;
+    bool has_alpha;
     do /*once*/
       {
-        ArrayModule = PyImport_ImportModule("array");
-        if (ArrayModule == 0)
+        array_module = PyImport_ImportModule("array");
+        if (array_module == 0)
             break;
-        if (!PyArg_ParseTuple(args, "O", &SrcPixBuf))
+        if (!PyArg_ParseTuple(args, "O", &srcpixbuf))
             break;
-        Py_INCREF(SrcPixBuf);
-        SrcPixString = PyObject_CallMethod(SrcPixBuf, "get_pixels", "");
+        Py_INCREF(srcpixbuf);
+        srcpixstring = PyObject_CallMethod(srcpixbuf, "get_pixels", "");
           /* have to make a copy of the pixels, can't get their original address ... sigh */
-        if (SrcPixString == 0)
+        if (srcpixstring == 0)
             break;
-        SrcPixArray = PyObject_CallMethod(ArrayModule, "array", "sO", "B", SrcPixString);
+        srcpixarray = PyObject_CallMethod(array_module, "array", "sO", "B", srcpixstring);
           /* and yet another copy of the pixels, into an array object that I can directly address ... sigh */
-        if (SrcPixArray == 0)
+        if (srcpixarray == 0)
             break;
-        Py_DECREF(SrcPixString);
-        SrcPixString = 0; /* try to free up some memory */
-        GetBufferInfo(SrcPixArray, &PixBase, &PixLen);
+        Py_DECREF(srcpixstring);
+        srcpixstring = 0; /* try to free up some memory */
+        get_buffer_info(srcpixarray, &pixbase, &pixlen);
         if (PyErr_Occurred())
             break;
-        ImageWidth = GetIntProperty(SrcPixBuf, "width");
-        ImageHeight = GetIntProperty(SrcPixBuf, "height");
-        RowStride = GetIntProperty(SrcPixBuf, "rowstride");
-        HasAlpha = GetBoolProperty(SrcPixBuf, "has-alpha");
-        NrChannels = GetIntProperty(SrcPixBuf, "n-channels");
+        image_width = get_int_property(srcpixbuf, "width");
+        image_height = get_int_property(srcpixbuf, "height");
+        row_stride = get_int_property(srcpixbuf, "rowstride");
+        has_alpha = get_bool_property(srcpixbuf, "has-alpha");
+        nr_channels = get_int_property(srcpixbuf, "n-channels");
         if (PyErr_Occurred())
             break;
-        if (!(HasAlpha ? NrChannels == 4 : NrChannels == 3))
+        if (!(has_alpha ? nr_channels == 4 : nr_channels == 3))
           {
             PyErr_SetString
               (
@@ -750,78 +750,78 @@ static PyObject * spuhelper_gtk_to_cairo_a
             break;
           } /*if*/
           {
-            const size_t MaxPixels = 128 /* convenient buffer size to avoid heap allocation */;
-            uint32_t PixBuf[MaxPixels];
-            size_t NrBufPixels, CurRow, ColsLeft;
-            const uint8_t * SrcPixels;
-            unsigned int A, R, G, B;
-            DstArray = PyObject_CallMethod(ArrayModule, "array", "s", "B");
-            if (DstArray == 0)
+            const size_t max_pixels = 128 /* convenient buffer size to avoid heap allocation */;
+            uint32_t pixbuf[max_pixels];
+            size_t nr_buf_pixels, cur_row, cols_left;
+            const uint8_t * srcpixels;
+            unsigned int a, r, g, b;
+            dstarray = PyObject_CallMethod(array_module, "array", "s", "B");
+            if (dstarray == 0)
                 break;
-            CurRow = 0;
-            ColsLeft = 0;
-            NrBufPixels = 0;
+            cur_row = 0;
+            cols_left = 0;
+            nr_buf_pixels = 0;
             for (;;)
               {
-              /* extend DstArray by a bunch of converted pixels at a time */
-                if (ColsLeft == 0 && CurRow < ImageHeight)
+              /* extend dstarray by a bunch of converted pixels at a time */
+                if (cols_left == 0 && cur_row < image_height)
                   {
-                    SrcPixels = (const uint8_t *)(PixBase + CurRow * RowStride);
-                    ++CurRow;
-                    ColsLeft = ImageWidth;
+                    srcpixels = (const uint8_t *)(pixbase + cur_row * row_stride);
+                    ++cur_row;
+                    cols_left = image_width;
                   } /*if*/
-                if (ColsLeft == 0 || NrBufPixels == MaxPixels)
+                if (cols_left == 0 || nr_buf_pixels == max_pixels)
                   {
-                    PyObject * BufString = 0;
-                    PyObject * Result = 0;
+                    PyObject * bufstring = 0;
+                    PyObject * result = 0;
                     do /*once*/
                       {
-                        if (NrBufPixels == 0)
+                        if (nr_buf_pixels == 0)
                             break; /* nothing to flush out */
-                        BufString = PyString_FromStringAndSize((const char *)PixBuf, NrBufPixels * 4);
-                        if (BufString == 0)
+                        bufstring = PyString_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
+                        if (bufstring == 0)
                             break;
-                        Result = PyObject_CallMethod(DstArray, "fromstring", "O", BufString);
-                        if (Result == 0)
+                        result = PyObject_CallMethod(dstarray, "fromstring", "O", bufstring);
+                        if (result == 0)
                             break;
                       }
                     while (false);
-                    Py_XDECREF(Result);
-                    Py_XDECREF(BufString);
+                    Py_XDECREF(result);
+                    Py_XDECREF(bufstring);
                     if (PyErr_Occurred())
                         break;
-                    if (ColsLeft == 0)
+                    if (cols_left == 0)
                         break;
-                    NrBufPixels = 0;
+                    nr_buf_pixels = 0;
                   } /*if*/
               /* fixme: Cairo wants premultipled alpha, GDK doesn't */
-                R = *SrcPixels++;
-                G = *SrcPixels++;
-                B = *SrcPixels++;
-                A = HasAlpha ? *SrcPixels++ : 255;
-                PixBuf[NrBufPixels++] =
-                        A << 24
+                r = *srcpixels++;
+                g = *srcpixels++;
+                b = *srcpixels++;
+                a = has_alpha ? *srcpixels++ : 255;
+                pixbuf[nr_buf_pixels++] =
+                        a << 24
                     |
-                        R << 16
+                        r << 16
                     |
-                        G << 8
+                        g << 8
                     |
-                        B;
-                --ColsLeft;
+                        b;
+                --cols_left;
               } /*for*/
             if (PyErr_Occurred())
                 break;
           }
       /* all done */
-        result = DstArray;
-        DstArray = 0; /* so I don't dispose of it yet */
+        result = dstarray;
+        dstarray = 0; /* so I don't dispose of it yet */
       }
     while (false);
-    Py_XDECREF(DstArray);
-    Py_XDECREF(SrcPixArray);
-    Py_XDECREF(SrcPixString);
-    Py_XDECREF(SrcPixBuf);
-    Py_XDECREF(ArrayModule);
+    Py_XDECREF(dstarray);
+    Py_XDECREF(srcpixarray);
+    Py_XDECREF(srcpixstring);
+    Py_XDECREF(srcpixbuf);
+    Py_XDECREF(array_module);
     return result;
   } /*spuhelper_gtk_to_cairo_a*/  
 
@@ -834,15 +834,15 @@ static PyObject * spuhelper_cairo_to_gtk
     GTK Pixbuf (big-endian) ordering. */
   {
     PyObject * result = 0;
-    PyObject * TheArray = 0;
+    PyObject * the_array = 0;
     unsigned long pixaddr, pixlen;
     uint8_t * pixels;
     do /*once*/
       {
-        if (!PyArg_ParseTuple(args, "O", &TheArray))
+        if (!PyArg_ParseTuple(args, "O", &the_array))
             break;
-        Py_INCREF(TheArray);
-        GetBufferInfo(TheArray, &pixaddr, &pixlen);
+        Py_INCREF(the_array);
+        get_buffer_info(the_array, &pixaddr, &pixlen);
         if (PyErr_Occurred())
             break;
         pixels = (uint8_t *)pixaddr;
@@ -862,7 +862,7 @@ static PyObject * spuhelper_cairo_to_gtk
         result = Py_None;
       }
     while (false);
-    Py_XDECREF(TheArray);
+    Py_XDECREF(the_array);
     return result;
   } /*spuhelper_cairo_to_gtk*/
 
@@ -874,9 +874,9 @@ static PyObject * spuhelper_write_png
   /* writes a buffer of two-bit pixels to a PNG file. */
   {
     PyObject * result = 0;
-    PyObject * TheArray = 0;
-    PyObject * ColorTuple = 0;
-    PyObject * OutFile = 0;
+    PyObject * the_array = 0;
+    PyObject * color_tuple = 0;
+    PyObject * outfile = 0;
     unsigned long pixaddr, pixlen, pixwidth, pixstride, pixheight;
     uint32_t colors[4];
     png_structp pngcontext = 0;
@@ -888,37 +888,37 @@ static PyObject * spuhelper_write_png
         unsigned char * data,
         size_t datasize
       )
-      /* PNG data-output callback which passes the data to OutFile.write. */
+      /* PNG data-output callback which passes the data to outfile.write. */
       {
-        PyObject * BufString = 0;
-        PyObject * Result = 0;
+        PyObject * bufstring = 0;
+        PyObject * result = 0;
         do /*once*/
           {
             if (PyErr_Occurred())
                 break;
-            BufString = PyString_FromStringAndSize((const char *)data, datasize);
-            if (BufString == 0)
+            bufstring = PyString_FromStringAndSize((const char *)data, datasize);
+            if (bufstring == 0)
                 break;
-            Result = PyObject_CallMethod(OutFile, "write", "O", BufString);
+            result = PyObject_CallMethod(outfile, "write", "O", bufstring);
           }
         while (false);
-        Py_XDECREF(BufString);
-        Py_XDECREF(Result);
+        Py_XDECREF(bufstring);
+        Py_XDECREF(result);
       } /*outfile_write*/
 
     do /*once*/
       {
-        if (!PyArg_ParseTuple(args, "OkOO", &TheArray, &pixwidth, &ColorTuple, &OutFile))
+        if (!PyArg_ParseTuple(args, "OkOO", &the_array, &pixwidth, &color_tuple, &outfile))
             break;
-        Py_INCREF(TheArray);
-        Py_INCREF(ColorTuple);
-        Py_INCREF(OutFile);
-        GetBufferInfo(TheArray, &pixaddr, &pixlen);
+        Py_INCREF(the_array);
+        Py_INCREF(color_tuple);
+        Py_INCREF(outfile);
+        get_buffer_info(the_array, &pixaddr, &pixlen);
         if (PyErr_Occurred())
             break;
         pixstride = (pixwidth + 3) / 4;
         pixheight = pixlen / pixstride;
-        ParseColorsTuple(ColorTuple, colors);
+        parse_colors_tuple(color_tuple, colors);
         if (PyErr_Occurred())
             break;
         pngcontext = png_create_write_struct
@@ -1027,9 +1027,9 @@ static PyObject * spuhelper_write_png
       {
         png_destroy_write_struct(&pngcontext, &pnginfo);
       } /*if*/
-    Py_XDECREF(OutFile);
-    Py_XDECREF(ColorTuple);
-    Py_XDECREF(TheArray);
+    Py_XDECREF(outfile);
+    Py_XDECREF(color_tuple);
+    Py_XDECREF(the_array);
     return result;
   } /*spuhelper_write_png*/
 
@@ -1041,8 +1041,8 @@ static PyObject * spuhelper_read_png_palette
   /* loads the palette definition, if any, from a PNG file. */
   {
     PyObject * result = 0;
-    PyObject * ResultColors = 0;
-    PyObject * InFile = 0;
+    PyObject * result_colors = 0;
+    PyObject * infile = 0;
     png_structp pngcontext = 0;
     png_infop pnginfo = 0;
     int bit_depth, color_type;
@@ -1050,7 +1050,7 @@ static PyObject * spuhelper_read_png_palette
     unsigned char * alpha;
     int nrcolors, nrtransparent;
     unsigned int i;
-    PyObject * ColorTuple = 0;
+    PyObject * color_tuple = 0;
 
     void infile_read
       (
@@ -1058,22 +1058,22 @@ static PyObject * spuhelper_read_png_palette
         unsigned char * data,
         size_t datasize
       )
-      /* PNG data-output callback which obtains data from InFile.read. */
+      /* PNG data-output callback which obtains data from infile.read. */
       {
-        PyObject * BufString = 0;
-        const unsigned char * Chars;
-        Py_ssize_t NrChars;
+        PyObject * bufstring = 0;
+        const unsigned char * chars;
+        Py_ssize_t nr_chars;
         do /*once*/
           {
             if (PyErr_Occurred())
                 break;
-            BufString = PyObject_CallMethod(InFile, "read", "k", datasize);
+            bufstring = PyObject_CallMethod(infile, "read", "k", datasize);
             if (PyErr_Occurred())
                 break;
-            PyString_AsStringAndSize(BufString, (char **)&Chars, &NrChars);
+            PyString_AsStringAndSize(bufstring, (char **)&chars, &nr_chars);
             if (PyErr_Occurred())
                 break;
-            if (NrChars < datasize)
+            if (nr_chars < datasize)
               {
                 PyErr_SetString
                   (
@@ -1082,17 +1082,17 @@ static PyObject * spuhelper_read_png_palette
                   );
               /* break; */ /* continue to return what I can */
               } /*if*/
-            memcpy(data, Chars, NrChars);
+            memcpy(data, chars, nr_chars);
           }
         while (false);
-        Py_XDECREF(BufString);
+        Py_XDECREF(bufstring);
       } /*infile_read*/
 
     do /*once*/
       {
-        if (!PyArg_ParseTuple(args, "O", &InFile))
+        if (!PyArg_ParseTuple(args, "O", &infile))
             break;
-        Py_INCREF(InFile);
+        Py_INCREF(infile);
         pngcontext = png_create_read_struct
           (
             /*user_png_ver =*/ PNG_LIBPNG_VER_STRING,
@@ -1174,57 +1174,57 @@ static PyObject * spuhelper_read_png_palette
           {
             nrtransparent = 0;
           } /*if*/
-        ResultColors = PyTuple_New(nrcolors);
-        if (ResultColors == 0)
+        result_colors = PyTuple_New(nrcolors);
+        if (result_colors == 0)
             break;
         i = 0;
         for (;;)
           {
             if (i == nrcolors)
                 break;
-            ColorTuple = PyTuple_New(4);
-            if (ColorTuple == 0)
+            color_tuple = PyTuple_New(4);
+            if (color_tuple == 0)
                 break;
           /* convert colours to premultiplied alpha */
             PyTuple_SET_ITEM
               (
-                ColorTuple,
+                color_tuple,
                 0,
                 PyInt_FromLong(pngcolors[i].red * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* R */
             PyTuple_SET_ITEM
               (
-                ColorTuple,
+                color_tuple,
                 1,
                 PyInt_FromLong(pngcolors[i].green * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* G */
             PyTuple_SET_ITEM
               (
-                ColorTuple,
+                color_tuple,
                 2,
                 PyInt_FromLong(pngcolors[i].blue * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* B */
-            PyTuple_SET_ITEM(ColorTuple, 3, PyInt_FromLong(i < nrtransparent ? alpha[i] : 255)); /* A */
+            PyTuple_SET_ITEM(color_tuple, 3, PyInt_FromLong(i < nrtransparent ? alpha[i] : 255)); /* A */
             if (PyErr_Occurred())
                 break;
-            PyTuple_SET_ITEM(ResultColors, i, ColorTuple);
-            ColorTuple = 0; /* lose stolen reference */
+            PyTuple_SET_ITEM(result_colors, i, color_tuple);
+            color_tuple = 0; /* lose stolen reference */
             ++i;
           } /*for*/
         if (PyErr_Occurred())
             break;
       /* all done */
-        result = ResultColors;
-        ResultColors = 0; /* so I don't dispose of it yet */
+        result = result_colors;
+        result_colors = 0; /* so I don't dispose of it yet */
       }
     while (false);
     if (pngcontext != 0)
       {
         png_destroy_read_struct(&pngcontext, &pnginfo, 0);
       } /*if*/
-    Py_XDECREF(ColorTuple);
-    Py_XDECREF(ResultColors);
-    Py_XDECREF(InFile);
+    Py_XDECREF(color_tuple);
+    Py_XDECREF(result_colors);
+    Py_XDECREF(infile);
     return result;
   } /*spuhelper_read_png_palette*/
 
