@@ -794,7 +794,7 @@ def load_menu_image(filename) :
             new_contents = XMLElementTree.parse(filename)
         except ExpatError :
             raise Failure("Not a valid SVG file.")
-        except IOError, why :
+        except IOError as why :
             raise Failure(str(why))
         #end try
         new_layers = {}
@@ -856,7 +856,7 @@ def load_menu_image(filename) :
         forget_button_blink()
         analyze_image()
         display_image()
-    except Failure, reason :
+    except Failure as reason :
         error_alert(reason.msg)
     #end try
 #end load_menu_image
@@ -866,7 +866,7 @@ def load_background_image(filename) :
     try :
         try :
             image_pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
-        except glib.GError, why :
+        except glib.GError as why :
             raise Failure(str(why))
         #end try
         image_pix_array = spuhelper.gtk_to_cairo_a(image_pixbuf)
@@ -880,7 +880,7 @@ def load_background_image(filename) :
           )
         forget_button_blink()
         display_image()
-    except Failure, reason :
+    except Failure as reason :
         error_alert(reason.msg)
     #end try
 #end load_background_image
@@ -890,7 +890,7 @@ def load_colors(palette_filename) :
     try :
         try :
             palette_file = open(palette_filename, "r")
-        except IOError, why :
+        except IOError as why :
             raise Failure(str(why))
         #end try
         if palette_file.readline().strip() != "GIMP Palette" :
@@ -934,7 +934,7 @@ def load_colors(palette_filename) :
             main_window.loaded_colors_list.append((color[0],)) # fixme display name as well
         #end for
         main_window.loaded_colors_display.get_column(0).set_title(name)
-    except Failure, reason :
+    except Failure as reason :
         error_alert(reason.msg)
     #end try
 #end load_colors
@@ -1011,7 +1011,7 @@ def load_saved_colors(menu_filename) :
                 ("", ".")[len(succeeded) != 0 or len(failed) != 0]
             )
         msg_alert(msg, gtk.MESSAGE_INFO)
-    except Failure, reason :
+    except Failure as reason :
         error_alert(reason.msg)
     #end try
 #end load_saved_colors
@@ -1598,7 +1598,7 @@ def select_save_menu(the_window) :
                 confirm_dialog.destroy()
                 if response == gtk.RESPONSE_OK :
                     break
-            except Failure, reason :
+            except Failure as reason :
                 error_alert(reason.msg)
                 # and keep prompting user for save filenames
             #end try
