@@ -244,13 +244,10 @@ static void parse_colors_tuple
         for (i = 0; i < nrcolors; ++i)
           {
             the_colors[i] = PyTuple_GetItem(color_tuple, i);
+            Py_XINCREF(the_colors[i]);
           } /*for*/
         if (PyErr_Occurred())
             break;
-        for (i = 0; i < nrcolors; ++i)
-          {
-            Py_INCREF(the_colors[i]);
-          } /*for*/
         for (i = 0;;)
           {
             if (i == nrcolors)
@@ -259,7 +256,7 @@ static void parse_colors_tuple
               {
                 if (j == 4)
                     break;
-                PyObject * color_obj = PyTuple_GetItem(the_colors[i], j);
+                PyObject * const color_obj = PyTuple_GetItem(the_colors[i], j);
                 if (PyErr_Occurred())
                     break;
                 const long chanval = PyInt_AsLong(color_obj);
