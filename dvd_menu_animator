@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: utf-8
+#!/usr/bin/python3
 #+
 # This script aims to simplify the job of creating menus for DVD-Video
 # discs. It takes as input an SVG graphic created by Inkscape representing the
@@ -7,7 +6,7 @@
 # displaying menu buttons in their highlighted and selected states, and generates
 # files suitable for input to the spumux tool in the dvdauthor package.
 #
-# Copyright 2010, 2015 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2010-2017 Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -21,7 +20,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #-
 
-from __future__ import division
 import sys
 import os
 import re
@@ -30,11 +28,29 @@ from xml.parsers.expat import \
     ExpatError
 from xml.etree import \
     ElementTree as XMLElementTree
+import colorsys
 import cairo
-import rsvg
-import glib
-import gobject
-import gtk
+import gi
+gi.require_version("Gdk", "3.0")
+gi.require_version("Gtk", "3.0")
+gi.require_version("Rsvg", "2.0")
+from gi.repository import \
+    GLib, \
+    GObject, \
+    Gdk, \
+    GdkPixbuf, \
+    Gtk, \
+    Rsvg
+# Python3 GTK & related docs ref starts at
+# <https://live.gnome.org/PyGObject>, mostly at <http://lazka.github.io/pgi-docs/>,
+# also see <https://wiki.gnome.org/action/show/Projects/PyGObject>, non-Python-specific
+# docs at <https://developer.gnome.org/references> and tutorial at
+# <https://python-gtk-3-tutorial.readthedocs.org/en/latest/>
+
+# Porting todo (see notes at <http://wiki.sugarlabs.org/go/Features/GTK3/Porting>):
+# * see note about constructors
+# * drag-and-drop changes
+
 import getopt
 
 import spuhelper
@@ -211,12 +227,9 @@ class xdg_base_dir :
         paths_to_try = iter((self.get_config_home(),) + self.config_search_path())
             # highest priority first
         while True :
-            try :
-                this_path = paths_to_try.next()
-            except StopIteration :
-                this_path = None
+            this_path = next(paths_to_try, None)
+            if this_path == None :
                 break
-            #end try
             this_path = os.path.join(this_path, path)
             if os.path.exists(this_path) :
                 break
@@ -302,8 +315,8 @@ def box_pack(the_widget, the_box) :
 
 def new_menu(in_menu_bar, label) :
     """creates a new menu in the specified menu bar with the specified name."""
-    bar_menu_item = gtk.MenuItem(label = label)
-    the_menu = gtk.Menu()
+    bar_menu_item = Gtk.MenuItem(label = label)
+    the_menu = Gtk.Menu()
     bar_menu_item.set_submenu(the_menu)
     in_menu_bar.append(bar_menu_item)
     return the_menu
@@ -312,7 +325,7 @@ def new_menu(in_menu_bar, label) :
 def new_menu_item(in_menu, label, accel_group, accel_key, action) :
     """creates a new item in the specified menu with the specified label,
     action to be performed on selection, and optional accelerator key."""
-    the_item = gtk.MenuItem(label = label)
+    the_item = Gtk.MenuItem(label = label)
     the_item.connect("activate", action)
     in_menu.append(the_item)
     if accel_group != None :
@@ -321,8 +334,8 @@ def new_menu_item(in_menu, label, accel_group, accel_key, action) :
             accel_signal = "activate",
             accel_group = accel_group,
             accel_key = ord(accel_key),
-            accel_mods = gtk.gdk.CONTROL_MASK,
-            accel_flags = gtk.ACCEL_VISIBLE
+            accel_mods = Gdk.ModifierType.CONTROL_MASK,
+            accel_flags = Gtk.AccelFlags.VISIBLE
           )
     #end if
     return the_item
@@ -330,7 +343,7 @@ def new_menu_item(in_menu, label, accel_group, accel_key, action) :
 
 def new_menu_separator_item(in_menu) :
     """creates a new separator item in the specified menu."""
-    the_item = gtk.MenuItem(label = None)
+    the_item = Gtk.MenuItem(label = None)
     in_menu.append(the_item)
 #end new_menu_separator_item
 
@@ -347,31 +360,31 @@ def define_scrolling_list \
   ) :
     """creates a single-column scrolling list of items taken from the specified
     column of list_model, with the specified heading."""
-    list_display = gtk.TreeView(list_model)
-    column = gtk.TreeViewColumn(heading)
+    list_display = Gtk.TreeView(model = list_model)
+    column = Gtk.TreeViewColumn(heading)
     column.set_alignment(0)
     list_display.append_column(column)
     if renderer == None :
-        renderer = gtk.CellRendererText()
+        renderer = Gtk.CellRendererText()
     #end if
     column.pack_start(renderer, True)
-    if col_attribute == None and hasattr(renderer, "on_celldata") :
-        column.set_cell_data_func(renderer, renderer.on_celldata, None)
-          # on_celldata should be a static method
+    if col_attribute == None and hasattr(renderer, "do_celldata") :
+        column.set_cell_data_func(renderer, renderer.do_celldata, None)
+          # do_celldata should be a static method
     else :
         column.add_attribute(renderer, col_attribute, col)
     #end if
-    list_scrolled_display = gtk.ScrolledWindow()
+    list_scrolled_display = Gtk.ScrolledWindow()
     list_scrolled_display.set_policy \
       (
-        hscrollbar_policy = gtk.POLICY_NEVER,
-        vscrollbar_policy = gtk.POLICY_ALWAYS
+        hscrollbar_policy = Gtk.PolicyType.NEVER,
+        vscrollbar_policy = Gtk.PolicyType.ALWAYS
       )
     list_scrolled_display.add(list_display)
     list_scrolled_display.set_size_request(*bounds)
     box_pack(list_scrolled_display, add_to_box)
     list_selection = list_display.get_selection()
-    list_selection.set_mode(gtk.SELECTION_SINGLE)
+    list_selection.set_mode(Gtk.SelectionMode.SINGLE)
     if on_selection_changed != None :
         list_selection.connect("changed", on_selection_changed)
     #end if
@@ -390,82 +403,56 @@ def get_single_list_selection(list_display, col) :
     return selection
 #end get_single_list_selection
 
-class ColorCellRenderer(gtk.GenericCellRenderer) :
+class ColorCellRenderer(Gtk.CellRenderer) :
     """renders a list cell showing a colour with optional opacity."""
 
     #def __init__(self) :
-    #     mustn't be present, or it doesn't get initialized properly
+    #     mustn't be present (at least as of GTK2), or it doesn't get initialized properly
     #end __init__
 
-    def on_get_size(self, draw_where, cell_rect) :
+    # note use of “do_” method-name prefixes in lieu of CellRendererClass,
+    # as per <https://stackoverflow.com/questions/14998298/how-to-write-custom-gtk-cellrenderer-in-python-and-gtk-3>
+
+    def do_get_size(self, draw_owner, cell_rect) :
         return (0, 0, 160, 20)
-    #end on_get_size
+    #end do_get_size
 
     @staticmethod
-    def on_celldata(column, cell, model, iter, user_data) :
+    def do_celldata(column, cell, model, iter, user_data) :
         cell.color = tuple(i / 255 for i in model.get_value(iter, 0))
-    #end on_celldata
+    #end do_celldata
 
-    def on_render(self, draw_where, draw_owner, background_rect, cell_rect, expose_rect, flags) :
-        draw = gtk.gdk.GC(draw_where)
-        color_map = draw.get_colormap()
-        draw.set_function(gtk.gdk.COPY)
-        draw.set_foreground \
-          (
-            color_map.alloc_color
-              (
-                gtk.gdk.Color
-                  (
-                    *tuple
-                      (
-                        int(round(c * 65535)) # premultiplied alpha will give darkening effect
-                        for c in self.color[:3]
-                      )
-                  )
-              )
-          )
-        draw_where.draw_rectangle \
-          (
-            draw,
-            True,
-            cell_rect.x,
-            cell_rect.y,
-            cell_rect.width,
-            cell_rect.height
-          )
-        if flags == gtk.CELL_RENDERER_SELECTED :
-            draw.set_function(gtk.gdk.INVERT)
-            draw.set_line_attributes \
-              (
-                line_width = 2,
-                line_style = gtk.gdk.LINE_SOLID,
-                cap_style = gtk.gdk.CAP_BUTT,
-                join_style = gtk.gdk.JOIN_MITER
-              )
-            draw_where.draw_rectangle \
-              (
-                draw,
-                False,
-                cell_rect.x,
-                cell_rect.y,
-                cell_rect.width,
-                cell_rect.height
-              )
+    def do_render(self, draw, draw_owner, background_rect, cell_rect, flags) :
+        draw.set_operator(cairo.OPERATOR_SOURCE)
+        draw.set_source_rgb(*self.color[:3]) # premultiplied alpha will give darkening effect
+        draw.new_path()
+        draw.rectangle(cell_rect.x, cell_rect.y, cell_rect.width, cell_rect.height)
+        draw.fill()
+        if flags == Gtk.CellRendererState.SELECTED :
+            draw.set_operator(cairo.OPERATOR_XOR)
+            draw.set_line_width(2)
+            # following are default anyway
+            # draw.set_dash([])
+            # draw.set_line_cap(cairo.LINE_CAP_BUTT)
+            # draw.set_line_join(cairo.LINE_JOIN_MITER)
+            draw.new_path()
+            draw.rectangle(cell_rect.x, cell_rect.y, cell_rect.width, cell_rect.height)
+            draw.stroke()
         #end if
-    #end on_render
+    #end do_render
 
-    def on_activate(self, the_event, event_target, location_path, background_rect, cell_rect, flags) :
+    def do_activate(self, the_event, event_target, location_path, background_rect, cell_rect, flags) :
         pass
-    #end on_activate
+    #end do_activate
 
 #end ColorCellRenderer
 
 def msg_alert(msg, type) :
     """displays a simple alert message with an OK button."""
-    the_dialog = gtk.MessageDialog \
+    the_dialog = Gtk.MessageDialog \
       (
-        flags = gtk.DIALOG_MODAL,
-        buttons = gtk.BUTTONS_OK,
+        flags = Gtk.DialogFlags.MODAL,
+        buttons = Gtk.ButtonsType.OK,
         type = type,
         message_format = msg
       )
@@ -475,20 +462,20 @@ def msg_alert(msg, type) :
 
 def error_alert(msg) :
     """displays a simple modal alert error message box."""
-    msg_alert(msg, gtk.MESSAGE_ERROR)
+    msg_alert(msg, Gtk.MessageType.ERROR)
 #end error_alert
 
 def choose_open_file(prompt, filters) :
     """lets the user choose a file matching the specified filters, returning
     its pathname on success or None if user cancelled."""
-    the_dialog = gtk.FileChooserDialog \
+    the_dialog = Gtk.FileChooserDialog \
       (
         title = prompt,
-        action = gtk.FILE_CHOOSER_ACTION_OPEN,
-        buttons = ("OK", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+        action = Gtk.FileChooserAction.OPEN,
+        buttons = ("OK", Gtk.ResponseType.OK, "Cancel", Gtk.ResponseType.CANCEL)
       )
     for name, pats in filters :
-        the_filter = gtk.FileFilter()
+        the_filter = Gtk.FileFilter()
         the_filter.set_name(name)
         for pat in pats :
             the_filter.add_pattern(pat)
@@ -496,7 +483,7 @@ def choose_open_file(prompt, filters) :
         the_dialog.add_filter(the_filter)
     #end for
     response = the_dialog.run()
-    if response == gtk.RESPONSE_OK :
+    if response == Gtk.ResponseType.OK :
         chosen_filename = the_dialog.get_filename()
     else :
         chosen_filename = None
@@ -507,7 +494,7 @@ def choose_open_file(prompt, filters) :
 
 def forget_button_blink() :
     if main_window.button_blink_task != None :
-        glib.source_remove(main_window.button_blink_task)
+        GLib.source_remove(main_window.button_blink_task)
         main_window.button_blink_task = None
     #end if
     main_window.button_selected = False
@@ -515,7 +502,7 @@ def forget_button_blink() :
 
 def blink_highlighted_button() :
     forget_button_blink()
-    main_window.button_blink_task = glib.timeout_add \
+    main_window.button_blink_task = GLib.timeout_add \
       (
         int(round(select_delay * 1000)),
         button_selection_done
@@ -529,13 +516,38 @@ def blink_highlighted_button() :
 #-
 
 class main_window :
-    # window -- gtk.Window object for main window
+    # window -- Gtk.Window object for main window
+    # button_blink_task -- if not None, the current transient task (created by GLib.timeout_add)
+    #     for blinking the current button between selected and highlighted states
+    # button_selected -- indicates whether the current highlighted button should be shown
+    #     in its selected state or not
+    # button_list -- a Gtk.ListStore for holding information about defined menu buttons
+    # button_highlight_rect -- if not None, a 4-tuple defining the bounds of the
+    #     current highlighted menu button
+    # image_display -- a Gtk.Image for showing the image
+    # image_click -- a Gtk.EventBox for capturing clicks on the image
+    # layer_list -- a Gtk.ListStore for holding information about layers in the SVG document
+    # layer_display -- a Gtk.TreeView for displaying the contents of layer_list
+    # loading -- reentrancy flag to suspend processing of color_display_changed
+    # color_button_group -- the radio button group for buttons selecting which image state to show
+    # colors_normal_list, colors_highlighted_list, colors_selected_list -- Gtk.ListStore objects
+    #     holding the colour tables for the respective image states
+    # status_msg -- a Label for showing a status message
     pass
 #end main_window
 
 class loaded_image :
     # contents -- parsed XML contents of image file
     # filename -- pathname of image file
+    # rowstride -- number of bytes per row of image
+    # image_draw_size -- scaled image (width, height) tuple
+    # srcdimension -- source image (width, height) tuple
+    # widescreen -- whether image is widescreen
+    # layers -- dict indexed by layer ID, each entry is dict with "visible" entry
+    # indexed_image -- pixel array representing indexed version of image
+    # colors -- original colour table for indexed image
+    # color_showing -- index [1 .. 4] of colour table to use to show indexed image,
+    #     or 0 to show original full-colour image
     pass
 #end loaded_image
 
@@ -574,7 +586,7 @@ def render_image_pix() :
         loaded_image.image_draw_size[1] / loaded_image.srcdimensions[1],
       ) # make sure it's all visible
     offscreen.scale(scale_factor, scale_factor)
-    svg = rsvg.Handle(data = image_as_svg())
+    svg = Rsvg.Handle.new_from_data(image_as_svg())
     svg.render_cairo(offscreen)
     offscreenpix.flush()
     return pixels
@@ -636,9 +648,9 @@ def analyze_image() :
         msg = ""
         main_window.loading = True # suspend triggering of color_display_changed
         for button in main_window.color_button_group.get_group() :
-            index = button.get_data("index")
+            index = button.dvd_menu_index
             button.set_active(index == 0)
-            button.set_flags(gtk.SENSITIVE)
+            button.set_sensitive(True)
         #end for
         main_window.loading = False
     #end if
@@ -694,7 +706,7 @@ def display_image() :
             #end if
         #end if
         light, dark = 0xFFD6D6D6, 0xFFACACAC
-          # same colours that gtk.ColorSelection uses for background of opacity display
+          # same colours that Gtk.ColorSelection uses for background of opacity display
         pattern_array = array.array \
           (
             "I",
@@ -716,7 +728,7 @@ def display_image() :
         check_pattern.set_extend(cairo.EXTEND_REPEAT)
         display_pixels = array.array \
           (
-            "B", # not "I" because then tostring puts the bytes in the wrong order
+            "B", # not "I" because then tostring puts the bytes in the wrong order--does this still matter?
             (255, 255, 255, 255) * loaded_image.image_draw_size[1] * (loaded_image.rowstride // 4)
               # initial colour doesn't matter, will be replaced by check_pattern
           )
@@ -772,18 +784,7 @@ def display_image() :
             composite.fill()
         #end if
         composite_surface.flush()
-        spuhelper.cairo_to_gtk(display_pixels)
-        offscreen = gtk.gdk.pixbuf_new_from_data \
-          (
-            data = display_pixels.tostring(),
-            colorspace = gtk.gdk.COLORSPACE_RGB,
-            has_alpha = True,
-            bits_per_sample = 8,
-            width = loaded_image.image_draw_size[0],
-            height = loaded_image.image_draw_size[1],
-            rowstride = loaded_image.rowstride
-          )
-        main_window.image_display.set_from_pixbuf(offscreen)
+        main_window.image_display.set_from_surface(composite_surface)
     #end if
 #end display_image
 
@@ -848,9 +849,9 @@ def load_menu_image(filename) :
           # default to using top layer as buttons
         loaded_image.color_showing = 0
         for button in main_window.color_button_group.get_group() :
-            index = button.get_data("index")
+            index = button.dvd_menu_index
             button.set_active(index == 0)
-            (button.unset_flags, button.set_flags)[index == 0](gtk.SENSITIVE)
+            button.set_sensitive(index == 0)
         #end for
         main_window.loading = False
         forget_button_blink()
@@ -865,11 +866,15 @@ def load_background_image(filename) :
     """loads a new background image."""
     try :
         try :
-            image_pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
-        except glib.GError as why :
+            image_pixbuf = GdkPixbuf.Pixbuf.new_from_file(filename)
+        except GLib.GError as why :
             raise Failure(str(why))
         #end try
         image_pix_array = spuhelper.gtk_to_cairo_a(image_pixbuf)
+          # I would like to get rid of this spuhelper routine, but there
+          # seems to be no easy way to construct a Cairo surface from
+          # non-PNG image formats like JPEG. Or could I create a
+          # temporary Gtk.Image and get a surface from that?
         loaded_image.background = cairo.ImageSurface.create_for_data \
           (
             image_pix_array, # data
@@ -975,11 +980,12 @@ def load_saved_colors(menu_filename) :
                         image_name = os.path.join(os.path.dirname(menu_filename), image_name)
                     #end if
                     try :
-                        image_file = open(image_name, "r")
+                        image_file = open(image_name, "rb")
                     except IOError :
                         raise Failure("couldn't open %s" % image_name)
                     #end try
                     try :
+                        sys.stderr.write("getting colours from %s\n" % repr(image_file)) # debug
                         colors = spuhelper.read_png_palette(image_file)
                     except RuntimeError :
                         raise Failure("couldn't make sense of %s" % image_name)
@@ -1010,7 +1016,7 @@ def load_saved_colors(menu_filename) :
             +
                 ("", ".")[len(succeeded) != 0 or len(failed) != 0]
             )
-        msg_alert(msg, gtk.MESSAGE_INFO)
+        msg_alert(msg, Gtk.MessageType.INFO)
     except Failure as reason :
         error_alert(reason.msg)
     #end try
@@ -1067,7 +1073,7 @@ def find_buttons() :
 
 def destroy_window(the_window) :
     # called when main window's close box is clicked.
-    gtk.main_quit()
+    Gtk.main_quit()
 #end destroy_window
 
 def select_load_menu_image(the_window) :
@@ -1150,21 +1156,21 @@ def edit_color(tree_view, color_path, view_column) :
     if color_path[0] < 4 : # excess colours won't be saved anyway
         color_list = tree_view.get_model()
         the_color = color_list.get_value(color_list.get_iter(color_path), 0)
-        choose_new_color = gtk.ColorSelectionDialog("Choose a colour, any colour")
+        choose_new_color = Gtk.ColorSelectionDialog(title = "Choose a colour, any colour")
+          # note: seems this is now deprecated -- should it be replaced by
+          # GtkColorChooserDialog <https://developer.gnome.org/gtk3/stable/GtkColorChooserDialog.html>?
         chooser = choose_new_color.get_color_selection()
         chooser.set_has_opacity_control(True)
         if the_color[3] != 0 : # convert from premultiplied alpha
-            chooser.set_current_color \
+            chooser.set_current_rgba \
               (
-                gtk.gdk.Color(*(i * 65535 // the_color[3] for i in the_color[:3]))
+                Gdk.RGBA(*(tuple((i / the_color[3] for i in the_color[:3])) + (the_color[3],)))
               )
-            chooser.set_current_alpha(the_color[3] * 257)
         else :
-            chooser.set_current_color(gtk.gdk.Color(0, 0, 0))
-            chooser.set_current_alpha(0)
+            chooser.set_current_rgba(Gdk.RGBA(0, 0, 0, 0))
         #end if
         response = choose_new_color.run()
-        if response == choose_new_color.get_response_for_widget(choose_new_color.ok_button) :
+        if response == choose_new_color.get_response_for_widget(choose_new_color.get_property("ok-button")) :
             new_color = chooser.get_current_color()
             opacity = chooser.get_current_alpha() >> 8
             new_color = \
@@ -1226,12 +1232,12 @@ def button_selection_done() :
 def image_click_event(the_widget, the_event) :
     handled = False
     if loaded_image.color_showing == 4 :
-        if the_event.type == gtk.gdk.BUTTON_PRESS :
+        if the_event.type == Gdk.EventType.BUTTON_PRESS :
             main_window.image_click.grab_focus()
-        elif the_event.type == gtk.gdk.BUTTON_RELEASE :
+        elif the_event.type == Gdk.EventType.BUTTON_RELEASE :
             pass
             # handled = True
-        elif the_event.type == gtk.gdk.FOCUS_CHANGE :
+        elif the_event.type == Gdk.EventType.FOCUS_CHANGE :
             if not the_event.in_ :
                 forget_button_blink()
                 if main_window.button_highlight != None :
@@ -1240,7 +1246,7 @@ def image_click_event(the_widget, the_event) :
                 #end if
             #end if
             # handled = True
-        elif the_event.type == gtk.gdk.KEY_PRESS :
+        elif the_event.type == Gdk.EventType.KEY_PRESS :
             if False :
                 sys.stderr.write \
                   (
@@ -1280,7 +1286,7 @@ def image_click_event(the_widget, the_event) :
             #end if
             handled = True
         #end if
-        if the_event.type == gtk.gdk.BUTTON_PRESS or the_event.type == gtk.gdk.MOTION_NOTIFY :
+        if the_event.type == Gdk.EventType.BUTTON_PRESS or the_event.type == Gdk.EventType.MOTION_NOTIFY :
             # do buttons in reverse order to pick up topmost one
             button_index = len(main_window.button_list)
             while True :
@@ -1317,7 +1323,7 @@ def image_click_event(the_widget, the_event) :
             #end if
             # handled = True
         #end if
-        if the_event.type == gtk.gdk._2BUTTON_PRESS :
+        if the_event.type == Gdk.EventType._2BUTTON_PRESS :
             if main_window.button_highlight != None :
                 blink_highlighted_button()
             #end if
@@ -1348,7 +1354,7 @@ def select_save_menu(the_window) :
             suffix \
         in \
             (
-                ((), ("letterbox",))[extra_filenames.has_key("letterbox") and which]
+                ((), ("letterbox",))["letterbox" in extra_filenames and which]
             +
                 tuple(s + ("", "-letterboxed")[which] for s in ("normal", "highlighted", "selected"))
             ) \
@@ -1365,7 +1371,7 @@ def select_save_menu(the_window) :
         if base_filename == None :
             base_filename = os.path.splitext(os.path.basename(the_dialog.get_filename()))[0]
         #end if
-        if extra_filenames.has_key("letterbox") :
+        if "letterbox" in extra_filenames :
             extra_filenames["letterbox"].set_text("%s-letterboxed.xml" % (base_filename,))
             for suffix in ("normal-letterboxed", "highlighted-letterboxed", "selected-letterboxed") :
                 extra_filenames[suffix].set_text("%s-%s.png" % (base_filename, suffix))
@@ -1380,7 +1386,7 @@ def select_save_menu(the_window) :
     def forget_synchronize() :
         # loses the synchronization task, if it hasn't triggered yet
         if context.synchronize_task != None :
-            glib.source_remove(context.synchronize_task)
+            GLib.source_remove(context.synchronize_task)
             context.synchronize_task = None
         #end if
     #end forget_synchronize
@@ -1388,7 +1394,7 @@ def select_save_menu(the_window) :
     def save_key_press(the_widget, the_event) :
         # intercepts user text entry for the saved filename to keep the
         # other generated filenames in sync.
-        if the_event.type == gtk.gdk.KEY_PRESS :
+        if the_event.type == Gdk.EventType.KEY_PRESS :
             if False :
                 sys.stderr.write \
                   (
@@ -1399,7 +1405,7 @@ def select_save_menu(the_window) :
             # keystroke. Only I way I can think of to get control at that point is by
             # a delayed task.
             forget_synchronize()
-            context.synchronize_task = glib.timeout_add \
+            context.synchronize_task = GLib.timeout_add \
               (
                 int(round(0.1 * 1000)),
                 synchronize_names,
@@ -1410,13 +1416,13 @@ def select_save_menu(the_window) :
 
 #begin select_save_menu
     if loaded_image.contents != None :
-        the_dialog = gtk.FileChooserDialog \
+        the_dialog = Gtk.FileChooserDialog \
           (
             title = "Save Menu As:",
-            action = gtk.FILE_CHOOSER_ACTION_SAVE,
-            buttons = ("Save", gtk.RESPONSE_OK, "Cancel", gtk.RESPONSE_CANCEL)
+            action = Gtk.FileChooserAction.SAVE,
+            buttons = ("Save", Gtk.ResponseType.OK, "Cancel", Gtk.ResponseType.CANCEL)
           )
-        extra_box = gtk.Table \
+        extra_box = Gtk.Table \
           (
             rows = (4, 9)[loaded_image.widescreen],
             columns = 4, # extra columns just to get cell sizes looking right
@@ -1437,10 +1443,10 @@ def select_save_menu(the_window) :
                     "highlighted-letterboxed" : "Highlighted Image (Letterboxed): ",
                     "selected-letterboxed" : "Selected Image (Letterboxed): ",
                 }
-            selected_aspects[False] = gtk.CheckButton("Save Full-Height Version")
+            selected_aspects[False] = Gtk.CheckButton(label = "Save Full-Height Version")
             selected_aspects[False].set_active(True) # not default
             selected_aspects[False].connect("toggled", selected_aspect_toggled, False)
-            selected_aspects[True] = gtk.CheckButton("Save Letterboxed Version")
+            selected_aspects[True] = Gtk.CheckButton(label = "Save Letterboxed Version")
             selected_aspects[True].set_active(True) # not default
             selected_aspects[True].connect("toggled", selected_aspect_toggled, True)
             extra_box.attach \
@@ -1486,14 +1492,14 @@ def select_save_menu(the_window) :
                   ) \
         :
             if suffix != None :
-                name_labels[suffix] = gtk.Label(extra_names_prompts[suffix])
+                name_labels[suffix] = Gtk.Label(extra_names_prompts[suffix])
                 name_labels[suffix].set_alignment(0, 0.5)
                 extra_box.attach \
                   (
                     name_labels[suffix],
                     0, 1, row, row + 1
                   )
-                extra_filenames[suffix] = gtk.Label()
+                extra_filenames[suffix] = Gtk.Label()
                 extra_filenames[suffix].set_alignment(0, 0.5)
                 if normal_label_style == None :
                     extra_filenames[suffix].ensure_style()
@@ -1506,24 +1512,33 @@ def select_save_menu(the_window) :
                   )
             #end if
         #end if
-        dimmed_label_style = gtk.RcStyle()
-        for state in (gtk.STATE_NORMAL,) : # no need for gtk.STATE_INSENSITIVE
-            dimmed_label_style.fg[state] = gtk.gdk.color_from_hsv \
-              (
-                hue = normal_label_style.fg[state].hue,
-                saturation = normal_label_style.fg[state].saturation / 2,
-                value = 1.0 - (1.0 - normal_label_style.fg[state].value) / 2
-              )
+        dimmed_label_style = Gtk.RcStyle()
+        if False :
+            # FIXME: Cannot get this to work. Access to .fg triggers
+            # “CRITICAL **: Stack overflow protection. Can't copy array element into GIArgument.”
+            # message and I get a 0-length list.
+            for state in (Gtk.StateFlags.NORMAL,) : # no need for Gtk.StateFlags.INSENSITIVE
+                the_color = Gdk.RGBA.from_color(normal_label_style.fg[state])
+                the_color = colorsys.rgb_to_hsv(the_color.red, the_color.green, the_color.blue)
+                the_color = colorsys.hsv_to_rgb \
+                  (
+                    the_color[0],
+                    the_color[1] / 2,
+                    1.0 - (1.0 - the_color[2]) / 2
+                  )
+                dimmed_label_style.fg[state] = \
+                    Gdk.RGBA(the_color[0], the_color[1], the_color[2]).to_color()
+            #end for
         #end if
-        normal_label_style = gtk.RcStyle() # with no customizations
-        name_label = gtk.Label("Video Format: ")
+        normal_label_style = Gtk.RcStyle() # with no customizations # fixme: not used
+        name_label = Gtk.Label("Video Format: ")
         name_label.set_alignment(0, 0.5)
         extra_box.attach \
           (
             name_label,
             0, 1, format_row, format_row + 1
           )
-        format_selector = gtk.combo_box_new_text()
+        format_selector = Gtk.ComboBoxText()
         default_video_format = get_default_video_format()
         for i, video_format in enumerate(sorted(valid_video_formats)) :
             format_selector.append_text(video_format)
@@ -1548,7 +1563,7 @@ def select_save_menu(the_window) :
         while True :
             response = the_dialog.run()
             forget_synchronize()
-            if response != gtk.RESPONSE_OK :
+            if response != Gtk.ResponseType.OK :
                 break
             #end if
             synchronize_names(None)
@@ -1586,17 +1601,17 @@ def select_save_menu(the_window) :
                   )
                 if len(overwriting) == 0 :
                     break
-                confirm_dialog = gtk.MessageDialog \
+                confirm_dialog = Gtk.MessageDialog \
                   (
-                    flags = gtk.DIALOG_MODAL,
-                    buttons = gtk.BUTTONS_OK_CANCEL,
-                    type = gtk.MESSAGE_QUESTION,
+                    flags = Gtk.DialogFlags.MODAL,
+                    buttons = Gtk.ButtonsType.OK_CANCEL,
+                    type = Gtk.MessageType.QUESTION,
                     message_format =
                         "File(s) already exist: %s. Overwrite?" % ", ".join(overwriting)
                   )
                 response = confirm_dialog.run()
                 confirm_dialog.destroy()
-                if response == gtk.RESPONSE_OK :
+                if response == Gtk.ResponseType.OK :
                     break
             except Failure as reason :
                 error_alert(reason.msg)
@@ -1652,7 +1667,7 @@ def select_save_menu(the_window) :
                               ))
                           )
                       )
-                    svg = rsvg.Handle(data = image_as_svg())
+                    svg = Rsvg.Handle.new_from_data(image_as_svg())
                     svg.render_cairo(rgb_render)
                     rgb_pix.flush()
                     if letterboxed :
@@ -1728,11 +1743,11 @@ def select_save_menu(the_window) :
                             (main_window.colors_selected_list, "selected"),
                         ) \
                     :
-                        # rgb_pix.write_to_png(open(image_names[suffix + ("", "-letterboxed")[letterboxed]] + "-debug.png", "w")) # debug
+                        # rgb_pix.write_to_png(open(image_names[suffix + ("", "-letterboxed")[letterboxed]] + "-debug.png", "wb")) # debug
                         image_name = image_names[suffix + ("", "-letterboxed")[letterboxed]]
                         colors = tuple(color[0] for color in colors)
                         indexed_image, _ = spuhelper.index_image(rgb_pixels, color_approx_count_factor)
-                        out_file = open(image_name, "w")
+                        out_file = open(image_name, "wb")
                         spuhelper.write_png \
                           (
                             indexed_image, # pixels array
@@ -1754,9 +1769,8 @@ def select_save_menu(the_window) :
                     stream = XMLElementTree.SubElement(subpictures, "stream")
                     spu = XMLElementTree.SubElement \
                       (
-                        parent = stream,
-                        tag = "spu",
-                        attrib =
+                        stream,
+                        "spu",
                             {
                                 "force" : "yes",
                                 # "transparent"?
@@ -1784,18 +1798,18 @@ def select_save_menu(the_window) :
                                 "y1" : str(int(bounds[1] + bounds[3]) & ~1),
                             }
                         for neighbour in ("up", "down", "left", "right") :
-                            if button_spec.has_key(neighbour) :
+                            if neighbour in button_spec :
                                 button_attrs[neighbour] = button_spec[neighbour] # fixme check it exists?
                             #end if
                         #end for
                         button_tag = XMLElementTree.SubElement \
                           (
-                            parent = spu,
-                            tag = ("button", "action")[button_spec.get("auto", False)],
-                            attrib = button_attrs
+                            spu,
+                            ("button", "action")[button_spec.get("auto", False)],
+                            button_attrs
                           )
                     #end for
-                    out_file = open(menu_filenames[letterboxed], "w")
+                    out_file = open(menu_filenames[letterboxed], "wb")
                     XMLElementTree.ElementTree(subpictures).write(out_file, "utf-8")
                     out_file.flush()
                     out_file.close()
@@ -1812,11 +1826,11 @@ def select_save_menu(the_window) :
 
 def about_me(the_window) :
     # displays a dialog showing information about the program.
-    about = gtk.AboutDialog()
+    about = Gtk.AboutDialog()
     about.set_name("DVD Menu Animator")
     about.set_version("0.04")
     about.set_comments("A utility to ease the construction of DVD-Video menus")
-    about.set_copyright("© 2010, 2011, 2015 Lawrence D'Oliveiro")
+    about.set_copyright("© 2010-2017 Lawrence D'Oliveiro")
     # about.set_license("GPLv3+")
     # about.set_authors(("Lawrence D'Oliveiro",))
     about.run()
@@ -1830,14 +1844,14 @@ def about_me(the_window) :
 def setup_main_window() :
     """creates all the window widgets and attaches all associated event handlers."""
     global main_window
-    main_window.window = gtk.Window()
+    main_window.window = Gtk.Window()
     main_window.window.connect("destroy", destroy_window)
     common_box_margin = 8
-    main_plus_menu_box = gtk.VBox(False, 0)
-    main_menu_bar = box_pack(gtk.MenuBar(), main_plus_menu_box)
-    main_box = box_pack(gtk.VBox(False, common_box_margin), main_plus_menu_box)
+    main_plus_menu_box = Gtk.VBox(False, 0)
+    main_menu_bar = box_pack(Gtk.MenuBar(), main_plus_menu_box)
+    main_box = box_pack(Gtk.VBox(False, common_box_margin), main_plus_menu_box)
     main_box.set_border_width(common_box_margin)
-    menu_accel_group = gtk.AccelGroup()
+    menu_accel_group = Gtk.AccelGroup()
     main_window.window.add_accel_group(menu_accel_group)
     file_menu = new_menu(main_menu_bar, "File")
     new_menu_item(file_menu, "Load Menu Image...", menu_accel_group, "O", select_load_menu_image)
@@ -1847,17 +1861,18 @@ def setup_main_window() :
     new_menu_separator_item(file_menu)
     new_menu_item(file_menu, "Save Menu...", menu_accel_group, "S", select_save_menu)
     new_menu_separator_item(file_menu)
-    new_menu_item(file_menu, "Quit", menu_accel_group, "Q", gtk.main_quit)
+    new_menu_item(file_menu, "Quit", menu_accel_group, "Q", Gtk.main_quit)
     help_menu = new_menu(main_menu_bar, "Help")
     new_menu_item(help_menu, "About DVD Menu Animator...", None, None, about_me)
-    middle_box = box_pack(gtk.HBox(False, common_box_margin), main_box)
+    middle_box = box_pack(Gtk.HBox(False, common_box_margin), main_box)
     middle_box.set_border_width(common_box_margin)
-    main_window.image_click = box_pack(gtk.EventBox(), middle_box)
-    main_window.image_display = gtk.Image()
+    main_window.image_click = box_pack(Gtk.EventBox(), middle_box)
+    main_window.image_display = Gtk.Image()
     main_window.image_click.add(main_window.image_display)
     main_window.image_click.set_visible_window(False)
     main_window.image_click.set_above_child(True)
-    main_window.image_click.set_flags(gtk.CAN_FOCUS)
+    main_window.image_click.set_can_focus(True)
+      # thanks to <http://wiki.sugarlabs.org/go/Features/GTK3/Porting/Implode>
     for \
         signal \
     in \
@@ -1872,37 +1887,37 @@ def setup_main_window() :
     :
         main_window.image_click.connect(signal, image_click_event)
     #end for
-    lists_col_box = box_pack(gtk.VBox(False, common_box_margin), middle_box)
-    list_1_box = box_pack(gtk.HBox(False, common_box_margin), lists_col_box)
-    radio_box = box_pack(gtk.VBox(False, common_box_margin), list_1_box)
-    list_2_box = box_pack(gtk.HBox(False, common_box_margin), lists_col_box)
+    lists_col_box = box_pack(Gtk.VBox(False, common_box_margin), middle_box)
+    list_1_box = box_pack(Gtk.HBox(False, common_box_margin), lists_col_box)
+    radio_box = box_pack(Gtk.VBox(False, common_box_margin), list_1_box)
+    list_2_box = box_pack(Gtk.HBox(False, common_box_margin), lists_col_box)
     main_window.color_button_group = None
     main_window.loading = True
     loaded_image.color_showing = 0
-    box_pack(gtk.Label("Using Colours:"), radio_box)
+    box_pack(Gtk.Label("Using Colours:"), radio_box)
     for index, label in enumerate(("Original", "Normal", "Highlighted", "Selected", "Live")) :
-        button = box_pack(gtk.RadioButton(main_window.color_button_group, label), radio_box)
-        button.set_data("index", index)
+        button = box_pack(Gtk.RadioButton(group = main_window.color_button_group, label = label), radio_box)
+        button.dvd_menu_index = index
         button.set_active(main_window.color_button_group == None)
         if main_window.color_button_group == None :
             main_window.color_button_group = button
         else :
-            button.unset_flags(gtk.SENSITIVE) # until an image is loaded
+            button.set_sensitive(False) # until an image is loaded
         #end if
         button.connect("toggled", color_display_changed, index)
     #end for
-    main_window.layer_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+    main_window.layer_list = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_STRING)
       # first col is display name, second is layer ID
-    main_window.button_list = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
+    main_window.button_list = Gtk.ListStore(GObject.TYPE_STRING, GObject.TYPE_PYOBJECT)
       # first col is button id/name, second is dictionary containing bounds and other info
     main_window.button_highlight = None
       # button to draw in highlighted/selected colours
     main_window.button_selected = False
     main_window.button_blink_task = None
-    main_window.colors_normal_list = gtk.ListStore(gobject.TYPE_PYOBJECT)
-    main_window.colors_highlighted_list = gtk.ListStore(gobject.TYPE_PYOBJECT)
-    main_window.colors_selected_list = gtk.ListStore(gobject.TYPE_PYOBJECT)
-    main_window.loaded_colors_list = gtk.ListStore(gobject.TYPE_PYOBJECT)
+    main_window.colors_normal_list = Gtk.ListStore(GObject.TYPE_PYOBJECT)
+    main_window.colors_highlighted_list = Gtk.ListStore(GObject.TYPE_PYOBJECT)
+    main_window.colors_selected_list = Gtk.ListStore(GObject.TYPE_PYOBJECT)
+    main_window.loaded_colors_list = Gtk.ListStore(GObject.TYPE_PYOBJECT)
     name_list_bounds = (160, 160)
     color_list_bounds = (120, 120)
     main_window.button_display = define_scrolling_list \
@@ -1986,25 +2001,25 @@ def setup_main_window() :
         color_list.connect("drag-data-received", drag_set_color)
         color_list.drag_dest_set \
           (
-            flags = gtk.DEST_DEFAULT_ALL,
-            targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-            actions = gtk.gdk.ACTION_COPY
+            flags = Gtk.DestDefaults.ALL,
+            targets = (Gtk.TargetEntry.new("STRING", Gtk.TargetFlags.SAME_APP, 1),),
+            actions = Gdk.DragAction.COPY
           )
         color_list.drag_source_set \
           (
-            start_button_mask = gtk.gdk.BUTTON1_MASK,
-            targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-            actions = gtk.gdk.ACTION_COPY
+            start_button_mask = Gdk.ModifierType.BUTTON1_MASK,
+            targets = (Gtk.TargetEntry.new("STRING", Gtk.TargetFlags.SAME_APP, 1),),
+            actions = Gdk.DragAction.COPY
           )
     #end for
     main_window.loaded_colors_display.connect("drag-data-get", drag_get_color)
     main_window.loaded_colors_display.drag_source_set \
       (
-        start_button_mask = gtk.gdk.BUTTON1_MASK,
-        targets = ((gtk.gdk.TARGET_STRING, gtk.TARGET_SAME_APP, 1),),
-        actions = gtk.gdk.ACTION_COPY
+        start_button_mask = Gdk.ModifierType.BUTTON1_MASK,
+        targets = (Gtk.TargetEntry.new("STRING", Gtk.TargetFlags.SAME_APP, 1),),
+        actions = Gdk.DragAction.COPY
       )
-    main_window.status_msg = box_pack(gtk.Label(), main_box)
+    main_window.status_msg = box_pack(Gtk.Label(), main_box)
     main_window.window.add(main_plus_menu_box)
     main_window.window.show_all()
 #end setup_main_window
@@ -2039,4 +2054,4 @@ loaded_image.contents = None # to begin with
 loaded_image.background = None # ditto
 parse_command_line()
 main_window.window.show()
-gtk.main()
+Gtk.main()

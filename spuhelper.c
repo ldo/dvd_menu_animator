@@ -21,6 +21,7 @@
 
 */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -159,8 +160,8 @@ static void get_buffer_info
         if (PyErr_Occurred())
             break;
         Py_INCREF(len_obj);
-        *addr = PyInt_AsUnsignedLongMask(addr_obj);
-        *len = PyInt_AsUnsignedLongMask(len_obj);
+        *addr = PyLong_AsUnsignedLongMask(addr_obj);
+        *len = PyLong_AsUnsignedLongMask(len_obj);
         if (PyErr_Occurred())
             break;
       }
@@ -184,7 +185,7 @@ static long get_int_property
         propvalue = PyObject_CallMethod(from_gobject, "get_property", "s", property_name);
         if (propvalue == 0)
             break;
-        result = PyInt_AsLong(propvalue);
+        result = PyLong_AsLong(propvalue);
       }
     while (false);
     Py_XDECREF(propvalue);
@@ -214,7 +215,7 @@ static bool get_bool_property
               );
             break;
           } /*if*/
-        result = PyObject_Compare(propvalue, Py_False) != 0;
+        result = PyObject_RichCompareBool(propvalue, Py_False, Py_NE) > 0;
       }
     while (false);
     Py_XDECREF(propvalue);
@@ -259,7 +260,7 @@ static void parse_colors_tuple
                 PyObject * const color_obj = PyTuple_GetItem(the_colors[i], j);
                 if (PyErr_Occurred())
                     break;
-                const long chanval = PyInt_AsLong(color_obj);
+                const long chanval = PyLong_AsLong(color_obj);
                 if (PyErr_Occurred())
                     break;
                 if (chanval < 0 || chanval > 255)
@@ -490,7 +491,7 @@ static PyObject * spuhelper_index_image
                   /* extend result_array by a bunch of converted pixels at a time */
                     if (pixlen == 0 || bufpixels == max_pixels)
                       {
-                        PyObject * bufstring = 0;
+                        PyObject * bufbytes = 0;
                         PyObject * result = 0;
                         do /*once*/
                           {
@@ -501,16 +502,16 @@ static PyObject * spuhelper_index_image
                               /* fill out unused part of byte with zeroes--actually shouldn't occur */
                                 pixbuf[bufpixels / 4] &= ~(0xff << bufpixels % 4 * 2);
                               } /*if*/
-                            bufstring = PyString_FromStringAndSize((const char *)pixbuf, (bufpixels + 3) / 4);
-                            if (bufstring == 0)
+                            bufbytes = PyBytes_FromStringAndSize((const char *)pixbuf, (bufpixels + 3) / 4);
+                            if (bufbytes == 0)
                                 break;
-                            result = PyObject_CallMethod(result_array, "fromstring", "O", bufstring);
+                            result = PyObject_CallMethod(result_array, "frombytes", "O", bufbytes);
                             if (result == 0)
                                 break;
                           }
                         while (false);
                         Py_XDECREF(result);
-                        Py_XDECREF(bufstring);
+                        Py_XDECREF(bufbytes);
                         if (PyErr_Occurred())
                             break;
                         if (pixlen == 0)
@@ -557,11 +558,11 @@ static PyObject * spuhelper_index_image
                 color_tuple = PyTuple_New(4);
                 if (color_tuple == 0)
                     break;
-                PyTuple_SET_ITEM(color_tuple, 0, PyInt_FromLong(pixel >> 16 & 255)); /* R */
-                PyTuple_SET_ITEM(color_tuple, 1, PyInt_FromLong(pixel >> 8 & 255)); /* G */
-                PyTuple_SET_ITEM(color_tuple, 2, PyInt_FromLong(pixel & 255)); /* B */
-                PyTuple_SET_ITEM(color_tuple, 3, PyInt_FromLong(pixel >> 24 & 255)); /* A */
-                count = PyInt_FromLong(histogram[histindex].count);
+                PyTuple_SET_ITEM(color_tuple, 0, PyLong_FromLong(pixel >> 16 & 255)); /* R */
+                PyTuple_SET_ITEM(color_tuple, 1, PyLong_FromLong(pixel >> 8 & 255)); /* G */
+                PyTuple_SET_ITEM(color_tuple, 2, PyLong_FromLong(pixel & 255)); /* B */
+                PyTuple_SET_ITEM(color_tuple, 3, PyLong_FromLong(pixel >> 24 & 255)); /* A */
+                count = PyLong_FromLong(histogram[histindex].count);
                 hist_entry_tuple = PyTuple_New(2);
                 if (PyErr_Occurred())
                     break;
@@ -641,22 +642,22 @@ static PyObject * spuhelper_expand_image
               {
                 if (nr_src_pixels == 0 || nr_buf_pixels == maxbufpixels)
                   {
-                    PyObject * bufstring = 0;
+                    PyObject * bufbytes = 0;
                     PyObject * result = 0;
                     do /*once*/
                       {
                         if (nr_buf_pixels == 0)
                             break; /* nothing to flush out */
-                        bufstring = PyString_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
-                        if (bufstring == 0)
+                        bufbytes = PyBytes_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
+                        if (bufbytes == 0)
                             break;
-                        result = PyObject_CallMethod(dstarray, "fromstring", "O", bufstring);
+                        result = PyObject_CallMethod(dstarray, "frombytes", "O", bufbytes);
                         if (result == 0)
                             break;
                       }
                     while (false);
                     Py_XDECREF(result);
-                    Py_XDECREF(bufstring);
+                    Py_XDECREF(bufbytes);
                     if (PyErr_Occurred())
                         break;
                     if (nr_src_pixels == 0)
@@ -769,22 +770,22 @@ static PyObject * spuhelper_gtk_to_cairo_a
                   } /*if*/
                 if (cols_left == 0 || nr_buf_pixels == max_pixels)
                   {
-                    PyObject * bufstring = 0;
+                    PyObject * bufbytes = 0;
                     PyObject * result = 0;
                     do /*once*/
                       {
                         if (nr_buf_pixels == 0)
                             break; /* nothing to flush out */
-                        bufstring = PyString_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
-                        if (bufstring == 0)
+                        bufbytes = PyBytes_FromStringAndSize((const char *)pixbuf, nr_buf_pixels * 4);
+                        if (bufbytes == 0)
                             break;
-                        result = PyObject_CallMethod(dstarray, "fromstring", "O", bufstring);
+                        result = PyObject_CallMethod(dstarray, "frombytes", "O", bufbytes);
                         if (result == 0)
                             break;
                       }
                     while (false);
                     Py_XDECREF(result);
-                    Py_XDECREF(bufstring);
+                    Py_XDECREF(bufbytes);
                     if (PyErr_Occurred())
                         break;
                     if (cols_left == 0)
@@ -887,19 +888,19 @@ static PyObject * spuhelper_write_png
       )
       /* PNG data-output callback which passes the data to outfile.write. */
       {
-        PyObject * bufstring = 0;
+        PyObject * bufbytes = 0;
         PyObject * result = 0;
         do /*once*/
           {
             if (PyErr_Occurred())
                 break;
-            bufstring = PyString_FromStringAndSize((const char *)data, datasize);
-            if (bufstring == 0)
+            bufbytes = PyBytes_FromStringAndSize((const char *)data, datasize);
+            if (bufbytes == 0)
                 break;
-            result = PyObject_CallMethod(outfile, "write", "O", bufstring);
+            result = PyObject_CallMethod(outfile, "write", "O", bufbytes);
           }
         while (false);
-        Py_XDECREF(bufstring);
+        Py_XDECREF(bufbytes);
         Py_XDECREF(result);
       } /*outfile_write*/
 
@@ -1057,17 +1058,17 @@ static PyObject * spuhelper_read_png_palette
       )
       /* PNG data-output callback which obtains data from infile.read. */
       {
-        PyObject * bufstring = 0;
+        PyObject * bufbytes = 0;
         const unsigned char * chars;
         Py_ssize_t nr_chars;
         do /*once*/
           {
             if (PyErr_Occurred())
                 break;
-            bufstring = PyObject_CallMethod(infile, "read", "k", datasize);
+            bufbytes = PyObject_CallMethod(infile, "read", "k", datasize);
             if (PyErr_Occurred())
                 break;
-            PyString_AsStringAndSize(bufstring, (char **)&chars, &nr_chars);
+            PyBytes_AsStringAndSize(bufbytes, (char **)&chars, &nr_chars);
             if (PyErr_Occurred())
                 break;
             if (nr_chars < datasize)
@@ -1082,7 +1083,7 @@ static PyObject * spuhelper_read_png_palette
             memcpy(data, chars, nr_chars);
           }
         while (false);
-        Py_XDECREF(bufstring);
+        Py_XDECREF(bufbytes);
       } /*infile_read*/
 
     do /*once*/
@@ -1187,21 +1188,21 @@ static PyObject * spuhelper_read_png_palette
               (
                 color_tuple,
                 0,
-                PyInt_FromLong(pngcolors[i].red * (i < nrtransparent ? 255 : alpha[i]) / 255)
+                PyLong_FromLong(pngcolors[i].red * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* R */
             PyTuple_SET_ITEM
               (
                 color_tuple,
                 1,
-                PyInt_FromLong(pngcolors[i].green * (i < nrtransparent ? 255 : alpha[i]) / 255)
+                PyLong_FromLong(pngcolors[i].green * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* G */
             PyTuple_SET_ITEM
               (
                 color_tuple,
                 2,
-                PyInt_FromLong(pngcolors[i].blue * (i < nrtransparent ? 255 : alpha[i]) / 255)
+                PyLong_FromLong(pngcolors[i].blue * (i < nrtransparent ? 255 : alpha[i]) / 255)
               ); /* B */
-            PyTuple_SET_ITEM(color_tuple, 3, PyInt_FromLong(i < nrtransparent ? alpha[i] : 255)); /* A */
+            PyTuple_SET_ITEM(color_tuple, 3, PyLong_FromLong(i < nrtransparent ? alpha[i] : 255)); /* A */
             if (PyErr_Occurred())
                 break;
             PyTuple_SET_ITEM(result_colors, i, color_tuple);
@@ -1246,7 +1247,7 @@ static PyMethodDef spuhelper_methods[] =
             " ordering, adding a fully-opaque alpha channel, and returns the result"
             " in a new array object."
     },
-    {"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS,
+    {"cairo_to_gtk", spuhelper_cairo_to_gtk, METH_VARARGS, /* TBD get rid of */
         "cairo_to_gtk(array)\n"
         "converts a buffer of RGBA-format pixels from Cairo (native-endian) ordering"
         " to GTK Pixbuf (big-endian) ordering."
@@ -1262,9 +1263,17 @@ static PyMethodDef spuhelper_methods[] =
     },
     {0, 0, 0, 0} /* marks end of list */
   };
-
-PyMODINIT_FUNC initspuhelper(void)
+static PyModuleDef spuhelper_module =
   {
-    (void)Py_InitModule3("spuhelper", spuhelper_methods,
-        "helper functions for dvd_menu_animator script");
-  } /*initspuhelper*/
+    PyModuleDef_HEAD_INIT,
+    "spuhelper", /* module name */
+    "helper functions for dvd_menu_animator script", /* docstring */
+    -1, /* size of per-interpreter state, -1 if entirely global */
+    spuhelper_methods,
+  };
+
+PyMODINIT_FUNC PyInit_spuhelper(void)
+  {
+    return
+        PyModule_Create(&spuhelper_module);
+  } /*PyInit_spuhelper*/
