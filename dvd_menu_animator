@@ -1530,7 +1530,7 @@ def select_save_menu(the_window) :
                     Gdk.RGBA(the_color[0], the_color[1], the_color[2]).to_color()
             #end for
         #end if
-        normal_label_style = Gtk.RcStyle() # with no customizations # fixme: not used
+        normal_label_style = Gtk.RcStyle() # with no customizations
         name_label = Gtk.Label("Video Format: ")
         name_label.set_alignment(0, 0.5)
         extra_box.attach \
