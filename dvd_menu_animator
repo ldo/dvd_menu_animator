@@ -1511,7 +1511,7 @@ def select_save_menu(the_window) :
                     1, 2, row, row + 1
                   )
             #end if
-        #end if
+        #end for
         dimmed_label_style = Gtk.RcStyle()
         if False :
             # FIXME: Cannot get this to work. Access to .fg triggers
