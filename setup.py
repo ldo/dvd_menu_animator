@@ -16,7 +16,7 @@ distutils.core.setup \
     description = "Tool to build DVD-Video menus",
     author = "Lawrence D'Oliveiro",
     author_email = "ldo@geek-central.gen.nz",
-    url = "http://github.com/ldo/dvd_menu_animator",
+    url = "https://github.com/ldo/dvd_menu_animator",
     scripts = ["dvd_menu_animator"],
     ext_modules =
         [
