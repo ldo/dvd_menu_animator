@@ -31,13 +31,13 @@ import inkex
 # Useful stuff
 #-
 
-def NewLayer(svg, LayerName) :
+def new_layer(svg, layer_name) :
     # adds a new layer to the SVG document and returns it.
-    TheLayer = lxml.etree.SubElement(svg, "g")
-    TheLayer.set(inkex.addNS("groupmode", "inkscape"), "layer")
-    TheLayer.set(inkex.addNS("label", "inkscape"), LayerName)
-    return TheLayer
-#end NewLayer
+    the_layer = lxml.etree.SubElement(svg, "g")
+    the_layer.set(inkex.addNS("groupmode", "inkscape"), "layer")
+    the_layer.set(inkex.addNS("label", "inkscape"), layer_name)
+    return the_layer
+#end new_layer
 
 #+
 # The effect
@@ -66,18 +66,18 @@ class OverscanEffect(inkex.extensions.EffectExtension) :
     def effect(self) :
         # actually performs the effect
         svg = self.document.getroot()
-        DrawingWidth = inkex.units.convert_unit(svg.attrib["width"], "pt")
-        DrawingHeight = inkex.units.convert_unit(svg.attrib["height"], "pt")
-        HorMargin = DrawingWidth * self.options.hormargin / 100
-        VertMargin = DrawingWidth * self.options.vertmargin /100
-        TheLayer = NewLayer \
+        drawing_width = inkex.units.convert_unit(svg.attrib["width"], "pt")
+        drawing_height = inkex.units.convert_unit(svg.attrib["height"], "pt")
+        hor_margin = drawing_width * self.options.hormargin / 100
+        vert_margin = drawing_width * self.options.vertmargin /100
+        the_layer = new_layer \
           (
             svg,
             "Overscan %.2f%%x%.2f%%" % (self.options.hormargin, self.options.vertmargin)
           )
         lxml.etree.SubElement \
           (
-            TheLayer,
+            the_layer,
             inkex.addNS("path", "svg"),
             {
                 "style" : inkex.Style({"stroke" : "none", "fill" : "#808080"}).to_str(),
@@ -85,16 +85,16 @@ class OverscanEffect(inkex.extensions.EffectExtension) :
                     "".join
                       ((
                         "M%.2f %.2f" % (0, 0),
-                        "H%.2f" % DrawingWidth,
-                        "V%.2f" % DrawingHeight,
+                        "H%.2f" % drawing_width,
+                        "V%.2f" % drawing_height,
                         "H%.2f" % 0,
                         # "V%.2f" % 0,
                         "Z",
-                        "M %.2f %.2f" % (HorMargin, VertMargin),
-                        "V%.2f" % (DrawingHeight - VertMargin),
-                        "H%.2f" % (DrawingWidth - HorMargin),
-                        "V%.2f" % VertMargin,
-                        # "H%.2f" % HorMargin,
+                        "M %.2f %.2f" % (hor_margin, vert_margin),
+                        "V%.2f" % (drawing_height - vert_margin),
+                        "H%.2f" % (drawing_width - hor_margin),
+                        "V%.2f" % vert_margin,
+                        # "H%.2f" % hor_margin,
                         "Z",
                       )),
             }
